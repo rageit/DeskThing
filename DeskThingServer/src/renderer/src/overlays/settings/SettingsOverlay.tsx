@@ -5,7 +5,8 @@ import {
   IconInfo,
   IconLayoutgrid,
   IconMusic,
-  IconServer
+  IconServer,
+  IconWifi
 } from '@renderer/assets/icons'
 import Button from '@renderer/components/Button'
 import ClientSettings from './ClientSettings'
@@ -13,14 +14,16 @@ import ServerSettings from './ServerSettings'
 import { useSearchParams } from 'react-router-dom'
 import MusicSettings from './MusicSettings'
 import AppsSettings from './AppSettings'
+import ConnectivitySettings from './ConnectivitySettings'
 import AboutSettings from './About'
 import ErrorBoundary from '@renderer/components/ErrorBoundary'
 
-const validPages = ['server', 'client', 'music', 'apps', 'about']
+const validPages = ['server', 'client', 'connectivity', 'music', 'apps', 'about']
 
 const settingsPages = [
   { key: 'server', label: 'Server', Icon: IconServer },
   { key: 'client', label: 'Client', Icon: IconComputer },
+  { key: 'connectivity', label: 'Connectivity', Icon: IconWifi },
   { key: 'music', label: 'Music', Icon: IconMusic },
   { key: 'apps', label: 'Apps', Icon: IconLayoutgrid },
   { key: 'about', label: 'About', Icon: IconInfo }
@@ -80,6 +83,7 @@ const SettingsOverlay: React.FC = () => {
           <ErrorBoundary>
             {currentPage == 'client' && <ClientSettings />}
             {currentPage == 'server' && <ServerSettings />}
+            {currentPage == 'connectivity' && <ConnectivitySettings />}
             {currentPage == 'music' && <MusicSettings />}
             {currentPage == 'apps' && <AppsSettings />}
             {currentPage == 'about' && <AboutSettings />}
