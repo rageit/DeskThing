@@ -92,7 +92,29 @@ export const platform = {
         type: 'configure',
         request: 'client',
         adbId
-      })) || false
+      })) || false,
+    setupWifi: async (
+      adbId: string,
+      ssid: string,
+      password?: string
+    ): Promise<string | undefined> =>
+      await sendPlatformData({
+        platform: PlatformIDs.ADB,
+        type: 'set',
+        request: 'wifi',
+        adbId,
+        ssid,
+        password
+      }),
+    getWifiStatus: async (
+      adbId: string
+    ): Promise<{ connected: boolean; ip?: string } | undefined> =>
+      await sendPlatformData({
+        platform: PlatformIDs.ADB,
+        type: 'get',
+        request: 'wifi-status',
+        adbId
+      })
   },
   websocket: {
     ping: async (clientId: string): Promise<{ server?: number; socket?: number } | undefined> => {

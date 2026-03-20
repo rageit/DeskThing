@@ -16,6 +16,7 @@ import { ADBServiceClass } from '@shared/stores/adbServiceClass'
 import { restartScript } from '@server/services/adb/restartScript'
 import { handleError } from '@server/utils/errorHandler'
 import { proxyScript } from '@server/services/adb/proxyScript'
+import { wifiScript } from '@server/services/adb/wifiScript'
 import { storeProvider } from '@server/stores/storeProvider'
 
 export class ADBService implements ADBServiceClass {
@@ -124,6 +125,21 @@ export class ADBService implements ADBServiceClass {
           const result = await proxyScript(this, scriptConfig)
           logger.info(
             `Completed Proxy Script for ${scriptConfig.deviceId} with result: ${result}`,
+            {
+              function: 'runScript',
+              source: 'ADBService'
+            }
+          )
+          return result
+        }
+        case SCRIPT_IDs.WIFI_SETUP: {
+          logger.info(`Running WiFi Setup Script on device ${scriptConfig.deviceId}`, {
+            function: 'runScript',
+            source: 'ADBService'
+          })
+          const result = await wifiScript(this, scriptConfig)
+          logger.info(
+            `Completed WiFi Setup Script for ${scriptConfig.deviceId} with result: ${result}`,
             {
               function: 'runScript',
               source: 'ADBService'
@@ -418,6 +434,25 @@ export class ADBService implements ADBServiceClass {
     )
     const transformedValue = parseInt(response)
     return Math.round((245 - transformedValue) * (100 / 245))
+  }
+
+  public async getDeviceWifiIp(deviceId: string): Promise<string | undefined> {
+    try {
+      const response = await this.sendCommand(
+        'shell "ifconfig wlan0 2>/dev/null | grep \'inet addr\' || echo no_ip"',
+        deviceId
+      )
+      if (response.includes('no_ip')) return undefined
+      const match = response.match(/inet addr:(\S+)/)
+      return match ? match[1] : undefined
+    } catch (error) {
+      logger.error('Failed to get device WiFi IP', {
+        error: error as Error,
+        function: 'getDeviceWifiIp',
+        source: 'ADBService'
+      })
+      return undefined
+    }
   }
 
   public async getSupervisorStatus(deviceId: string): Promise<Record<string, string>> {

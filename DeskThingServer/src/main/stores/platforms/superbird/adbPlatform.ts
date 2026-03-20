@@ -80,6 +80,10 @@ export class ADBPlatform extends EventEmitter<PlatformEvents> implements Platfor
           case 'devices': {
             return this.clients
           }
+          case 'wifi-status': {
+            const wifiIp = await this.adbService.getDeviceWifiIp(data.adbId)
+            return { connected: !!wifiIp, ip: wifiIp }
+          }
           default:
             break
         }
@@ -138,6 +142,36 @@ export class ADBPlatform extends EventEmitter<PlatformEvents> implements Platfor
             await this.refreshClient(data.adbId, true)
             progressBus.complete(ProgressChannel.PLATFORM_CHANNEL, 'Completed Successfully')
             return true
+          }
+          case 'wifi': {
+            progressBus.startOperation(
+              ProgressChannel.PLATFORM_CHANNEL,
+              'Setting up WiFi',
+              'Initializing WiFi Configuration',
+              [
+                {
+                  channel: ProgressChannel.PUSH_SCRIPT,
+                  weight: 100
+                }
+              ]
+            )
+            try {
+              const result = await this.adbService.runScript(SCRIPT_IDs.WIFI_SETUP, {
+                deviceId: data.adbId,
+                ssid: data.ssid,
+                password: data.password,
+                reboot: false
+              })
+              progressBus.complete(ProgressChannel.PLATFORM_CHANNEL, 'WiFi configured')
+              return result
+            } catch (error) {
+              progressBus.error(
+                ProgressChannel.PLATFORM_CHANNEL,
+                'Error configuring WiFi',
+                handleError(error)
+              )
+              return undefined
+            }
           }
           default:
             break
@@ -452,8 +486,10 @@ export class ADBPlatform extends EventEmitter<PlatformEvents> implements Platfor
       const macBt = await this.adbService.getDeviceMacBT(adbId)
       update('Getting device brightness', 55)
       const brightness = await this.adbService.getDeviceBrightness(adbId)
-      update('Getting device services', 65)
+      update('Getting device services', 60)
       const services = await this.adbService.getSupervisorStatus(adbId)
+      update('Getting WiFi status', 65)
+      const wifiIp = await this.adbService.getDeviceWifiIp(adbId)
 
       const transformedServices: Record<string, boolean> = Object.entries(services).reduce(
         (acc, [key, val]) => {
@@ -480,7 +516,8 @@ export class ADBPlatform extends EventEmitter<PlatformEvents> implements Platfor
               offline: false,
               brightness: brightness,
               mac_bt: macBt,
-              services: transformedServices
+              services: transformedServices,
+              wifi_ip: wifiIp
             }
           },
           identifiers: {
@@ -539,7 +576,8 @@ export class ADBPlatform extends EventEmitter<PlatformEvents> implements Platfor
               offline: false,
               brightness: brightness,
               mac_bt: macBt,
-              services: transformedServices
+              services: transformedServices,
+              wifi_ip: wifiIp
             }
           },
           connected: false,

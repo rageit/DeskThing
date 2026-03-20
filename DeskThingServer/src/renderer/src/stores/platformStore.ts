@@ -16,6 +16,10 @@ interface PlatformStoreState {
   configure: (adbId: string) => Promise<boolean>
   setServiceStatus: (adbId: string, service: string, status: boolean) => Promise<boolean>
 
+  // WiFi
+  setupWifi: (adbId: string, ssid: string, password?: string) => Promise<string | undefined>
+  getWifiStatus: (adbId: string) => Promise<{ connected: boolean; ip?: string } | undefined>
+
   // WebSocket
   ping: (clientId: string) => Promise<{ server?: number; socket?: number } | undefined>
   pong: (clientId: string) => Promise<string | undefined>
@@ -64,6 +68,15 @@ const usePlatformStore = create<PlatformStoreState>((set, get) => ({
 
   refreshADB: async () => {
     return window.electron.platform.adb.refresh()
+  },
+
+  // WiFi Methods
+  setupWifi: async (adbId: string, ssid: string, password?: string) => {
+    return window.electron.platform.adb.setupWifi(adbId, ssid, password)
+  },
+
+  getWifiStatus: async (adbId: string) => {
+    return window.electron.platform.adb.getWifiStatus(adbId)
   },
 
   // WebSocket Methods

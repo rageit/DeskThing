@@ -93,6 +93,20 @@ export type ADBPlatformIPC = {
       data?: string
     }
   | {
+      type: 'set'
+      request: 'wifi'
+      adbId: string
+      ssid: string
+      password?: string
+      data?: string
+    }
+  | {
+      type: 'get'
+      request: 'wifi-status'
+      adbId: string
+      data?: { connected: boolean; ip?: string }
+    }
+  | {
       type: 'refresh'
       request: 'adb'
       data?: Client[]

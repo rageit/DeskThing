@@ -131,6 +131,13 @@ export interface ADBServiceClass {
   getDeviceBrightness(deviceId: string): Promise<number>
 
   /**
+   * Retrieves the WiFi IP address of a specific device.
+   * @param deviceId The identifier of the target device
+   * @returns A promise resolving to the device's WiFi IP address or undefined
+   */
+  getDeviceWifiIp(deviceId: string): Promise<string | undefined>
+
+  /**
    * Retrieves the status of the supervisor service for a specific device.
    * @param deviceId The identifier of the target device
    * @returns A promise resolving to a record of supervisor service statuses

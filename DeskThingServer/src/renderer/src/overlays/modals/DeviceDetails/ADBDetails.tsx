@@ -8,6 +8,8 @@ import {
   IconReload,
   IconStop,
   IconUpload,
+  IconWifi,
+  IconWifiDisconnect,
   IconWrench,
   IconX
 } from '@renderer/assets/icons'
@@ -31,6 +33,8 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
   const setServiceStatus = usePlatformStore((state) => state.setServiceStatus)
   const pushStaged = usePlatformStore((state) => state.pushStaged)
   const pushScript = usePlatformStore((state) => state.pushScript)
+  const setupWifi = usePlatformStore((state) => state.setupWifi)
+  const getWifiStatus = usePlatformStore((state) => state.getWifiStatus)
   const progress = useChannelProgress(ProgressChannel.IPC_PLATFORM)
   const initialSettings = useSettingsStore((settings) => settings.settings)
   const saveSettings = useSettingsStore((settings) => settings.saveSettings)
@@ -39,6 +43,11 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
   // ADB commands
   const [command, setCommand] = useState('')
   const [response, setResponse] = useState('')
+
+  // WiFi state
+  const [wifiSsid, setWifiSsid] = useState('')
+  const [wifiPassword, setWifiPassword] = useState('')
+  const [wifiStatus, setWifiStatus] = useState<{ connected: boolean; ip?: string } | null>(null)
 
   // State Management
   const [loading, setLoading] = useState(false)
@@ -154,6 +163,35 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
   const handleShutdown = async (): Promise<void> => {
     if (!adbId) return
     await sendCommand(adbId, 'shell poweroff')
+  }
+
+  const handleSetupWifi = async (): Promise<void> => {
+    if (!adbId || !wifiSsid.trim()) return
+
+    setAnimatingIcons((prev) => ({ ...prev, wifi: true }))
+    try {
+      await setupWifi(adbId, wifiSsid.trim(), wifiPassword || undefined)
+      // Check status after setup
+      const status = await getWifiStatus(adbId)
+      if (status) setWifiStatus(status)
+    } catch (error) {
+      console.error('Error setting up WiFi:', error)
+    } finally {
+      setAnimatingIcons((prev) => ({ ...prev, wifi: false }))
+    }
+  }
+
+  const handleCheckWifiStatus = async (): Promise<void> => {
+    if (!adbId) return
+    setAnimatingIcons((prev) => ({ ...prev, wifiCheck: true }))
+    try {
+      const status = await getWifiStatus(adbId)
+      if (status) setWifiStatus(status)
+    } catch (error) {
+      console.error('Error checking WiFi status:', error)
+    } finally {
+      setAnimatingIcons((prev) => ({ ...prev, wifiCheck: false }))
+    }
   }
 
   const handleAddToSettings = async (): Promise<void> => {
@@ -304,6 +342,75 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
             <p className="text-sm font-geistMono text-zinc-500 mt-2">{brightness}%</p>
           </div>
 
+          <div className="bg-zinc-900 p-4 rounded-lg">
+            <p className="text-sm font-geistMono text-zinc-400 mb-3">WiFi Configuration</p>
+            <div className="flex items-center gap-2 mb-3">
+              {client.meta.adb?.wifi_ip ? (
+                <div className="flex items-center gap-2 text-green-400">
+                  <IconWifi iconSize={20} />
+                  <span className="text-sm font-geistMono">Connected: {client.meta.adb.wifi_ip}</span>
+                </div>
+              ) : wifiStatus?.connected ? (
+                <div className="flex items-center gap-2 text-green-400">
+                  <IconWifi iconSize={20} />
+                  <span className="text-sm font-geistMono">Connected: {wifiStatus.ip}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-zinc-500">
+                  <IconWifiDisconnect iconSize={20} />
+                  <span className="text-sm font-geistMono">Not connected</span>
+                </div>
+              )}
+              <Button
+                title="Check WiFi Status"
+                className="bg-zinc-800 hover:bg-zinc-700 transition-colors duration-200 p-1.5 rounded-lg ml-auto"
+                onClick={handleCheckWifiStatus}
+                disabled={animatingIcons.wifiCheck}
+              >
+                {animatingIcons.wifiCheck ? (
+                  <IconLoading className="animate-spin" iconSize={16} />
+                ) : (
+                  <IconRefresh iconSize={16} />
+                )}
+              </Button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSetupWifi()
+              }}
+              className="space-y-2"
+            >
+              <input
+                type="text"
+                placeholder="WiFi Network Name (SSID)"
+                value={wifiSsid}
+                onChange={(e) => setWifiSsid(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-800 rounded-lg text-white border border-zinc-700 focus:outline-none focus:border-zinc-500 transition-colors duration-200 text-sm"
+              />
+              <input
+                type="password"
+                placeholder="WiFi Password (leave empty for open network)"
+                value={wifiPassword}
+                onChange={(e) => setWifiPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-800 rounded-lg text-white border border-zinc-700 focus:outline-none focus:border-zinc-500 transition-colors duration-200 text-sm"
+              />
+              <Button
+                title="Configure WiFi on Device"
+                className="bg-zinc-800 hover:bg-zinc-700 transition-colors duration-200 gap-2 rounded-lg p-2 w-full justify-center"
+                type="submit"
+                disabled={!wifiSsid.trim() || animatingIcons.wifi}
+              >
+                {animatingIcons.wifi ? (
+                  <IconLoading className="animate-spin" />
+                ) : (
+                  <IconWifi />
+                )}
+                <p className="text-sm">{animatingIcons.wifi ? 'Configuring WiFi...' : 'Setup WiFi'}</p>
+              </Button>
+            </form>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-zinc-900 p-4 rounded-lg">
               <p className="text-sm font-geistMono text-zinc-400">Device Version</p>
@@ -317,6 +424,12 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
               <p className="text-sm font-geistMono text-zinc-400">MAC BT</p>
               <h3 className="text-xl mt-2">{client.meta.adb?.mac_bt || 'Unknown'}</h3>
             </div>
+            {client.meta.adb?.wifi_ip && (
+              <div className="bg-zinc-900 p-4 rounded-lg">
+                <p className="text-sm font-geistMono text-zinc-400">WiFi IP</p>
+                <h3 className="text-xl mt-2">{client.meta.adb.wifi_ip}</h3>
+              </div>
+            )}
           </div>
 
           {is_nerd && (
