@@ -75,7 +75,8 @@ export const determineValidUrl = async (urls: string[]): Promise<GitRepoUrl> => 
       }
     } catch (error) {
       logger.debug(
-        `Error while trying to reconstruct repository URL from ${url}: ${error} ${handleError(error)}`
+        `Error while trying to reconstruct repository URL from ${url}: ${error} ${handleError(error)}`,
+        { source: 'releaseValidation', function: 'determineValidUrl' }
       )
     }
   }
@@ -105,7 +106,7 @@ export const determineValidUpdateUrl = async (
   }
 
   if (validUrls.length > 0) {
-    logger.debug(`Found url ${validUrls[0]} as a valid download url for ${fileId}`)
+    logger.debug(`Found url ${validUrls[0]} as a valid download url for ${fileId}`, { source: 'releaseValidation', function: 'determineValidUpdateUrl' })
     return validUrls[0] as GitDownloadUrl
   }
 
@@ -133,7 +134,7 @@ export const determineValidUpdateUrl = async (
           repo = urlParts[githubIndex + 2]
         }
       } else {
-        logger.debug(`Invalid URL: ${url} ${index}/${urls.length}`)
+        logger.debug(`Invalid URL: ${url} ${index}/${urls.length}`, { source: 'releaseValidation', function: 'determineValidUpdateUrl' })
       }
 
       if (!owner || !repo) continue
@@ -156,12 +157,13 @@ export const determineValidUpdateUrl = async (
           return reconstructedUrl as GitDownloadUrl
         } else {
           logger.debug(
-            `Invalid URL: ${url} (turned to ${reconstructedUrl}) ${index}/${urls.length}`
+            `Invalid URL: ${url} (turned to ${reconstructedUrl}) ${index}/${urls.length}`,
+            { source: 'releaseValidation', function: 'determineValidUpdateUrl' }
           )
         }
       }
     } catch (error) {
-      logger.debug(`Invalid URL: ${url} ${index}/${urls.length}. ${handleError(error)}`)
+      logger.debug(`Invalid URL: ${url} ${index}/${urls.length}. ${handleError(error)}`, { source: 'releaseValidation', function: 'determineValidUpdateUrl' })
       continue
     }
   }
@@ -217,12 +219,12 @@ export const sanitizeLatestMultiJSON = (
   }
 
   if (!('fileIds' in typedAsset) || !Array.isArray(typedAsset.fileIds)) {
-    logger.warn(`fileIds not found in ${typedAsset.meta_version}, setting to []`)
+    logger.warn(`fileIds not found in ${typedAsset.meta_version}, setting to []`, { source: 'releaseValidation', function: 'sanitizeLatestMultiJSON' })
     typedAsset.fileIds = []
   }
 
   if (!('repositories' in typedAsset) || !Array.isArray(typedAsset.repositories)) {
-    logger.warn(`repositories not found in ${typedAsset.meta_version}, setting to []`)
+    logger.warn(`repositories not found in ${typedAsset.meta_version}, setting to []`, { source: 'releaseValidation', function: 'sanitizeLatestMultiJSON' })
     typedAsset.repositories = []
   }
 
@@ -257,22 +259,22 @@ export const sanitizeLatestClientJSON = (
   }
 
   if (!('downloads' in typedAsset)) {
-    logger.warn(`downloads not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`downloads not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestClientJSON' })
     typedAsset.downloads = 0
   }
 
   if (!('size' in typedAsset)) {
-    logger.warn(`size not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`size not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestClientJSON' })
     typedAsset.size = 0
   }
 
   if (!('updatedAt' in typedAsset)) {
-    logger.warn(`updatedAt not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`updatedAt not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestClientJSON' })
     typedAsset.updatedAt = Date.now()
   }
 
   if (!('createdAt' in typedAsset)) {
-    logger.warn(`createdAt not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`createdAt not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestClientJSON' })
     typedAsset.createdAt = Date.now()
   }
 
@@ -314,22 +316,22 @@ export const sanitizeLatestAppJSON = (
   }
 
   if (!('downloads' in typedAsset)) {
-    logger.warn(`downloads not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`downloads not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestAppJSON' })
     typedAsset.downloads = 0
   }
 
   if (!('size' in typedAsset)) {
-    logger.warn(`size not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`size not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestAppJSON' })
     typedAsset.size = 0
   }
 
   if (!('updatedAt' in typedAsset)) {
-    logger.warn(`updatedAt not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`updatedAt not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestAppJSON' })
     typedAsset.updatedAt = Date.now()
   }
 
   if (!('createdAt' in typedAsset)) {
-    logger.warn(`createdAt not found in ${typedAsset.meta_version}, setting to 0`)
+    logger.warn(`createdAt not found in ${typedAsset.meta_version}, setting to 0`, { source: 'releaseValidation', function: 'sanitizeLatestAppJSON' })
     typedAsset.createdAt = Date.now()
   }
 
@@ -384,7 +386,8 @@ export const handleLatestValidation = async <
 
     if (satisfies(newRelease.meta_version, '>0.11.8')) {
       logger.warn(
-        `meta_version of ${newRelease.meta_version} is newer and not fully supported. Will try anyways (maybe try updating?)`
+        `meta_version of ${newRelease.meta_version} is newer and not fully supported. Will try anyways (maybe try updating?)`,
+        { source: 'releaseValidation', function: 'handleLatestValidation' }
       )
     }
 

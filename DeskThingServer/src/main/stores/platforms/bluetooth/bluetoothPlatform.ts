@@ -40,7 +40,7 @@ export class BluetoothPlatform extends BasePlatform {
 
     this.available = await this.btService.isAvailable()
     if (!this.available) {
-      logger.warn('Bluetooth is not available on this system (bluetoothctl not found)', {
+      logger.warn('Bluetooth is not available on this system', {
         function: 'start',
         source: 'BluetoothPlatform'
       })

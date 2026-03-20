@@ -104,10 +104,10 @@ export const deviceHandler: ClientHandlerMap = {
         })
         return await flashStore.cancelFlash()
       case 'restart':
-        logger.error('Restart not implemented')
+        logger.error('Restart not implemented', { source: 'deviceIpc', function: 'FLASH_OPERATION' })
         return
       case 'unbrick':
-        logger.error('Unbrick not implemented')
+        logger.error('Unbrick not implemented', { source: 'deviceIpc', function: 'FLASH_OPERATION' })
         return
       case 'driver':
         return await flashStore.configureDriverForDevice()
@@ -306,7 +306,8 @@ const handleAutoConfig = async (step: number): Promise<AutoConfigResult> => {
 
         if (disconnectedDevices.length > 1) {
           logger.debug(
-            `${disconnectedDevices.length} devices disconnected. Choosing first one ${disconnectedDevices[0].clientId}`
+            `${disconnectedDevices.length} devices disconnected. Choosing first one ${disconnectedDevices[0].clientId}`,
+            { source: 'deviceIpc', function: 'handleAutoConfig' }
           )
         }
 

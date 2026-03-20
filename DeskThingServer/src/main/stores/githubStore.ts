@@ -46,7 +46,7 @@ export class GithubStore implements CacheableStore, GithubStoreClass {
     this.jsonCache = undefined
     this.validationCache?.clear()
     this.validationCache = undefined
-    logger.info('All caches cleared', { source: 'githubStore' })
+    logger.info('All caches cleared', { source: 'GithubStore', function: 'clearCache' })
   }
 
   private cleanupExpiredEntries(): void {
@@ -236,7 +236,7 @@ export class GithubStore implements CacheableStore, GithubStoreClass {
   public getAllReleases = async (repoUrl: string, force?: boolean): Promise<GithubRelease[]> => {
     try {
       const apiUrl = this.convertToApiUrl(repoUrl) + '/releases'
-      logger.debug(`Converted url ${repoUrl} to ${apiUrl}`)
+      logger.debug(`Converted url ${repoUrl} to ${apiUrl}`, { source: 'GithubStore', function: 'getAllReleases' })
 
       // Checking the cache first
       const result = this.checkCache(apiUrl)

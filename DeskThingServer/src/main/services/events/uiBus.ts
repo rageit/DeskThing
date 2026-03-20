@@ -38,7 +38,10 @@ class UIEventBus extends EventEmitter<EventMap> {
   }
 
   private setupServerEventHandler(): void {
-    logger.warn('Server event handler is not implemented yet!')
+    logger.warn('Server event handler is not implemented yet!', {
+      source: 'UIEventBus',
+      function: 'setupServerEventHandler'
+    })
 
     progressBus.on('progress', (progressEvent: ProgressEvent) => {
       this.sendIpcData({

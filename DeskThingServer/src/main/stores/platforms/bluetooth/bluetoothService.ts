@@ -1,5 +1,6 @@
 import { execFile } from 'child_process'
 import logger from '@server/utils/logger'
+import os from 'os'
 
 export interface BluetoothDevice {
   address: string
@@ -10,17 +11,20 @@ export interface BluetoothDevice {
 }
 
 /**
- * BluetoothService provides methods for interacting with the system Bluetooth
- * via bluetoothctl (Linux). Supports scanning, pairing, connecting, and
- * sending data over RFCOMM serial connections.
+ * BluetoothService provides methods for interacting with the system Bluetooth.
+ * Uses bluetoothctl on Linux and system_profiler on macOS.
  */
 export class BluetoothService {
   private scanning: boolean = false
+  private readonly platform: NodeJS.Platform = os.platform()
 
   /**
-   * Runs a bluetoothctl command and returns the output.
+   * Runs a bluetoothctl command and returns the output (Linux only).
    */
   public async runCommand(command: string): Promise<string> {
+    if (this.platform === 'darwin') {
+      throw new Error('bluetoothctl is not available on macOS. Use macOS-specific methods.')
+    }
     return new Promise((resolve, reject) => {
       execFile('bluetoothctl', command.split(' '), { timeout: 15000 }, (error, stdout, stderr) => {
         if (error) {
@@ -38,10 +42,40 @@ export class BluetoothService {
   }
 
   /**
-   * Checks if bluetoothctl is available on the system.
+   * Runs a system_profiler command to query Bluetooth info (macOS only).
+   */
+  private async runMacCommand(args: string[] = []): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile(
+        'system_profiler',
+        ['SPBluetoothDataType', ...args],
+        { timeout: 15000 },
+        (error, stdout, stderr) => {
+          if (error) {
+            logger.error(`macOS Bluetooth query failed`, {
+              error: error as Error,
+              function: 'runMacCommand',
+              source: 'BluetoothService'
+            })
+            reject(new Error(`Bluetooth error: ${stderr || error.message}`))
+          } else {
+            resolve(stdout)
+          }
+        }
+      )
+    })
+  }
+
+  /**
+   * Checks if Bluetooth is available on the system.
    */
   public async isAvailable(): Promise<boolean> {
     try {
+      if (this.platform === 'darwin') {
+        const output = await this.runMacCommand()
+        return output.includes('Bluetooth')
+      }
+      // Linux: check for bluetoothctl
       await this.runCommand('--version')
       return true
     } catch {
@@ -53,6 +87,10 @@ export class BluetoothService {
    * Powers the Bluetooth adapter on or off.
    */
   public async setPower(on: boolean): Promise<void> {
+    if (this.platform === 'darwin') {
+      // macOS manages Bluetooth power through System Preferences; skip
+      return
+    }
     await this.runCommand(`power ${on ? 'on' : 'off'}`)
   }
 
@@ -65,6 +103,11 @@ export class BluetoothService {
     this.scanning = true
 
     try {
+      if (this.platform === 'darwin') {
+        // macOS: system_profiler returns currently known devices; no active scan needed
+        return this.getDevices()
+      }
+
       await this.runCommand('power on')
 
       // scan on is a blocking command in bluetoothctl, so we spawn it separately
@@ -96,6 +139,10 @@ export class BluetoothService {
    */
   public async getDevices(): Promise<BluetoothDevice[]> {
     try {
+      if (this.platform === 'darwin') {
+        return this.getMacDevices()
+      }
+
       const output = await this.runCommand('devices')
       const deviceLines = output.split('\n').filter((line) => line.startsWith('Device'))
       const parsed: { address: string; name: string }[] = []
@@ -128,12 +175,95 @@ export class BluetoothService {
   }
 
   /**
+   * Parses macOS system_profiler output to get Bluetooth devices.
+   */
+  private async getMacDevices(): Promise<BluetoothDevice[]> {
+    try {
+      const output = await this.runMacCommand()
+      const devices: BluetoothDevice[] = []
+
+      // Parse connected/paired devices from system_profiler output
+      const lines = output.split('\n')
+      let currentDevice: Partial<BluetoothDevice> | null = null
+      let inDevicesSection = false
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+
+        if (
+          trimmed.includes('Connected:') ||
+          trimmed.includes('Devices (Paired, Configured, etc.):')
+        ) {
+          inDevicesSection = true
+          continue
+        }
+
+        if (inDevicesSection && trimmed.endsWith(':') && !trimmed.includes('Address')) {
+          // New device name
+          if (currentDevice?.address) {
+            devices.push({
+              address: currentDevice.address,
+              name: currentDevice.name || 'Unknown',
+              paired: currentDevice.paired ?? false,
+              connected: currentDevice.connected ?? false,
+              trusted: currentDevice.paired ?? false
+            })
+          }
+          currentDevice = { name: trimmed.replace(':', '').trim() }
+        }
+
+        if (currentDevice) {
+          if (trimmed.startsWith('Address:')) {
+            currentDevice.address = trimmed.replace('Address:', '').trim()
+          }
+          if (trimmed.startsWith('Connected:')) {
+            currentDevice.connected = trimmed.includes('Yes')
+          }
+          if (trimmed.startsWith('Paired:')) {
+            currentDevice.paired = trimmed.includes('Yes')
+          }
+        }
+      }
+
+      // Push last device
+      if (currentDevice?.address) {
+        devices.push({
+          address: currentDevice.address,
+          name: currentDevice.name || 'Unknown',
+          paired: currentDevice.paired ?? false,
+          connected: currentDevice.connected ?? false,
+          trusted: currentDevice.paired ?? false
+        })
+      }
+
+      return devices
+    } catch (error) {
+      logger.error('Failed to get macOS Bluetooth devices', {
+        error: error as Error,
+        function: 'getMacDevices',
+        source: 'BluetoothService'
+      })
+      return []
+    }
+  }
+
+  /**
    * Gets detailed info about a specific Bluetooth device.
    */
   public async getDeviceInfo(
     address: string
   ): Promise<{ paired: boolean; connected: boolean; trusted: boolean }> {
     try {
+      if (this.platform === 'darwin') {
+        // On macOS, device info is already included in getDevices parsing
+        const devices = await this.getMacDevices()
+        const device = devices.find((d) => d.address === address)
+        return {
+          paired: device?.paired ?? false,
+          connected: device?.connected ?? false,
+          trusted: device?.paired ?? false
+        }
+      }
       const output = await this.runCommand(`info ${address}`)
       return {
         paired: output.includes('Paired: yes'),
@@ -149,6 +279,13 @@ export class BluetoothService {
    * Pairs with a Bluetooth device.
    */
   public async pair(address: string): Promise<boolean> {
+    if (this.platform === 'darwin') {
+      logger.warn('Bluetooth pairing must be done through macOS System Preferences', {
+        function: 'pair',
+        source: 'BluetoothService'
+      })
+      return false
+    }
     try {
       await this.runCommand(`pair ${address}`)
       return true
@@ -166,6 +303,9 @@ export class BluetoothService {
    * Trusts a Bluetooth device (allows auto-reconnect).
    */
   public async trust(address: string): Promise<boolean> {
+    if (this.platform === 'darwin') {
+      return false
+    }
     try {
       await this.runCommand(`trust ${address}`)
       return true
@@ -183,6 +323,13 @@ export class BluetoothService {
    * Connects to a paired Bluetooth device.
    */
   public async connect(address: string): Promise<boolean> {
+    if (this.platform === 'darwin') {
+      logger.warn('Bluetooth connections on macOS must be managed through System Preferences', {
+        function: 'connect',
+        source: 'BluetoothService'
+      })
+      return false
+    }
     try {
       await this.runCommand(`connect ${address}`)
       return true
@@ -200,6 +347,9 @@ export class BluetoothService {
    * Disconnects from a Bluetooth device.
    */
   public async disconnect(address: string): Promise<boolean> {
+    if (this.platform === 'darwin') {
+      return false
+    }
     try {
       await this.runCommand(`disconnect ${address}`)
       return true
@@ -217,6 +367,9 @@ export class BluetoothService {
    * Removes a paired Bluetooth device.
    */
   public async remove(address: string): Promise<boolean> {
+    if (this.platform === 'darwin') {
+      return false
+    }
     try {
       await this.runCommand(`remove ${address}`)
       return true

@@ -356,7 +356,7 @@ export class ADBPlatform extends BasePlatform {
     }
 
     logger.debug(`Auto detect is ${autoDetect}`, {
-      domain: 'adbPlatform',
+      source: 'ADBPlatform',
       function: 'restartInterval'
     })
 
@@ -368,7 +368,7 @@ export class ADBPlatform extends BasePlatform {
     this.intervalId = setInterval(async () => {
       const devices = await this.adbService.getDevices()
       logger.debug(`Autodetected Devices: ${devices}`, {
-        domain: 'adbPlatform',
+        source: 'ADBPlatform',
         function: 'restartInterval'
       })
 
@@ -376,7 +376,7 @@ export class ADBPlatform extends BasePlatform {
 
       if (devices.length > this.clients.length) {
         logger.debug(`New devices detected: ${devices.length - this.clients.length}`, {
-          domain: 'adbPlatform',
+          source: 'ADBPlatform',
           function: 'restartInterval'
         })
         await this.refreshDevices()
@@ -422,7 +422,7 @@ export class ADBPlatform extends BasePlatform {
 
       // Open the ports one at a time
       for (const adbId of newAdbIDs) {
-        logger.debug(`Opening port for ${adbId}`)
+        logger.debug(`Opening port for ${adbId}`, { source: 'ADBPlatform', function: 'refreshDevices' })
         await this.adbService.openPort(adbId, this.adbPort)
       }
 
@@ -626,7 +626,7 @@ export class ADBPlatform extends BasePlatform {
     _data: DeskThingToDeviceCore & { app?: string }
   ): Promise<boolean> {
     const internalId = this.getInternalId(clientId)
-    logger.warn('Unable to send data via ADB! Failed.')
+    logger.warn('Unable to send data via ADB! Failed.', { source: 'ADBPlatform', function: 'sendData' })
     if (!internalId) return false
     return false
   }

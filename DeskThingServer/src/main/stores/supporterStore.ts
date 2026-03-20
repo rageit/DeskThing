@@ -82,7 +82,8 @@ export class SupporterStore implements SupporterStoreClass, CacheableStore {
 
       if (!response.ok) {
         logger.debug(
-          `Failed to fetch members. Token Exists: ${!!this.TOKEN}. Api Url Exists: ${this.MEMBERS_API_URL}`
+          `Failed to fetch members. Token Exists: ${!!this.TOKEN}. Api Url Exists: ${this.MEMBERS_API_URL}`,
+          { source: 'SupporterStore', function: 'fetchMembers' }
         )
         throw new Error(`Failed to fetch members: ${response.statusText} (${response.status})`)
       }
@@ -116,11 +117,11 @@ export class SupporterStore implements SupporterStoreClass, CacheableStore {
 
   async fetchSupporters(opts: SupporterFetchOptions): Promise<PaginatedResponse<SupporterData>> {
     try {
-      logger.debug('Checking cache for supporters')
+      logger.debug('Checking cache for supporters', { source: 'SupporterStore', function: 'fetchSupporters' })
       const cachedResponse = await this.checkCache(opts)
       if (cachedResponse) return cachedResponse
 
-      logger.debug('Fetching supporters')
+      logger.debug('Fetching supporters', { source: 'SupporterStore', function: 'fetchSupporters' })
       const [oneTimeResponse, membersResponse] = await Promise.all([
         this.fetchOneTimeSupporters(opts).catch(() => undefined),
         this.fetchMembers(opts).catch(() => undefined)

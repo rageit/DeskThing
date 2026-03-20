@@ -106,7 +106,7 @@ export class MusicService implements MusicStoreClass {
     const currentApp = await this.getPlaybackSource()
 
     if (!currentApp) {
-      Logger.warn(`No audio source app available`)
+      Logger.warn(`No audio source app available`, { source: 'MusicService', function: 'handleClientRequest' })
       return
     }
 
@@ -222,7 +222,7 @@ export class MusicService implements MusicStoreClass {
     // Listen for settings changes
     this.settingsStore.on('music_playbackLocation', async (data) => {
       if (data && data !== this.currentApp) {
-        Logger.info(`Changing playback source: ${this.currentApp} → ${data}`)
+        Logger.info(`Changing playback source: ${this.currentApp} → ${data}`, { source: 'MusicService', function: 'handlePlaybackSourceChange' })
         this.currentApp = data
         await this.refreshMusicData()
       }
@@ -262,7 +262,7 @@ export class MusicService implements MusicStoreClass {
       const currentSong = this.songCache.getCurrentSong() // ensures the song is correctly filled with available data
 
       if (!currentSong) {
-        Logger.debug(`No song data available to broadcast`)
+        Logger.debug(`No song data available to broadcast`, { source: 'MusicService', function: 'broadcastCurrentSong' })
         return
       }
 
@@ -291,7 +291,7 @@ export class MusicService implements MusicStoreClass {
         return
       }
 
-      Logger.debug(`Received request for song data from client ${data?.client?.clientId}`)
+      Logger.debug(`Received request for song data from client ${data?.client?.clientId}`, { source: 'MusicService', function: 'handleSongRequest' })
 
       const cachedSong = this.songCache.getCurrentSong()
       if (cachedSong) {
@@ -322,7 +322,7 @@ export class MusicService implements MusicStoreClass {
     if (!settings) return
 
     this.currentApp = settings.music_playbackLocation || 'none'
-    Logger.debug(`Initializing current app to ${this.currentApp}`)
+    Logger.debug(`Initializing current app to ${this.currentApp}`, { source: 'MusicService', function: 'initializeCurrentApp' })
 
     await this.updateRefreshInterval(settings.music_refreshInterval)
     await this.refreshMusicData()
@@ -415,10 +415,16 @@ export class MusicService implements MusicStoreClass {
     }
 
     const currentApp = await this.getPlaybackSource()
-    Logger.log(LOGGING_LEVELS.LOG, `Attempting to refresh music data`)
+    Logger.log(LOGGING_LEVELS.LOG, `Attempting to refresh music data`, {
+      source: 'MusicService',
+      function: 'refreshMusicData'
+    })
 
     if (!currentApp) {
-      Logger.log(LOGGING_LEVELS.LOG, `No playback source available`)
+      Logger.log(LOGGING_LEVELS.LOG, `No playback source available`, {
+        source: 'MusicService',
+        function: 'refreshMusicData'
+      })
       return
     }
 
@@ -428,9 +434,15 @@ export class MusicService implements MusicStoreClass {
         request: AUDIO_REQUESTS.REFRESH,
         app: 'music'
       })
-      Logger.log(LOGGING_LEVELS.LOG, `Refreshed music data from ${currentApp}`)
+      Logger.log(LOGGING_LEVELS.LOG, `Refreshed music data from ${currentApp}`, {
+        source: 'MusicService',
+        function: 'refreshMusicData'
+      })
     } catch (error) {
-      Logger.log(LOGGING_LEVELS.ERROR, `Music refresh failed: ${error}`)
+      Logger.log(LOGGING_LEVELS.ERROR, `Music refresh failed: ${error}`, {
+        source: 'MusicService',
+        function: 'refreshMusicData'
+      })
     }
   }
 }

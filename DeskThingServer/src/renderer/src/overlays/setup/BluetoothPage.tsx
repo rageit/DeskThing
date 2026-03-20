@@ -75,7 +75,7 @@ const BluetoothPage: React.FC = () => {
           </Button>
           {available === false && (
             <p className="text-red-400 text-sm">
-              Bluetooth is not available on this system. Make sure bluetoothctl is installed.
+              Bluetooth is not available on this system. On Linux, make sure bluetoothctl is installed. On macOS, ensure Bluetooth is enabled in System Preferences.
             </p>
           )}
         </div>

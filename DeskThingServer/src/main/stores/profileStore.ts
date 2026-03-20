@@ -143,7 +143,7 @@ export class ProfileStore
 
   async getActiveProfile(): Promise<DeskThingProfile | undefined> {
     if (!this._profile) {
-      logger.debug('No profile loaded. Loading Default')
+      logger.debug('No profile loaded. Loading Default', { source: 'ProfileStore', function: 'getActiveProfile' })
       await this.loadFromFile()
     }
     return this._profile
@@ -208,10 +208,10 @@ export class ProfileStore
     const profile = await this.getActiveProfile()
 
     if (!profile) {
-      logger.debug('No profile found!')
+      logger.debug('No profile found!', { source: 'ProfileStore', function: 'applyProfileToClient' })
       return false
     }
-    logger.debug(`Setting ${clientId}'s config to ${profile.id} because it was requested`)
+    logger.debug(`Setting ${clientId}'s config to ${profile.id} because it was requested`, { source: 'ProfileStore', function: 'applyProfileToClient' })
 
     try {
       // Send the configuration for the client

@@ -39,7 +39,7 @@ export const runPostInstall = async (appId?: string): Promise<void> => {
 
   if (!scriptPath) {
     progressBus.complete(ProgressChannel.FN_APP_POSTINSTALL, 'Postinstall skipped (no file found)')
-    logger.debug('Locations Checked: ' + possibleLocations.join(', '))
+    logger.debug('Locations Checked: ' + possibleLocations.join(', '), { source: 'appPostinstall', function: 'runPostInstall' })
     return
   }
 
@@ -127,7 +127,7 @@ export const runPostInstall = async (appId?: string): Promise<void> => {
       'Postinstall Complete'
     )
     if (errors.length > 0) {
-      logger.warn(`Postinstall errors: ${errors.join(', ')}`)
+      logger.warn(`Postinstall errors: ${errors.join(', ')}`, { source: 'appPostinstall', function: 'runPostInstall' })
     }
   }
 }

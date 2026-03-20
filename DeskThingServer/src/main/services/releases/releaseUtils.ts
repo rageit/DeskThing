@@ -62,7 +62,7 @@ export const createClientReleaseFile = async (force = false): Promise<ClientRele
     const githubStore = await storeProvider.getStore('githubStore')
 
     update(`Fetching latest release from ${clientRepo}`, 20)
-    logger.debug(`Fetching latest release from ${clientRepo}`)
+    logger.debug(`Fetching latest release from ${clientRepo}`, { source: 'releaseUtils', function: 'createClientReleaseFile' })
     const latestReleaseAssets = await githubStore.getLatestRelease(clientRepo, force)
 
     if (!latestReleaseAssets) {
@@ -167,7 +167,7 @@ export const createAppReleaseFile = async (force = false): Promise<AppReleaseFil
     const githubStore = await storeProvider.getStore('githubStore')
 
     update(`Fetching latest release from ${appsRepo}`, 20)
-    logger.debug(`Fetching latest release from ${appsRepo}`)
+    logger.debug(`Fetching latest release from ${appsRepo}`, { source: 'releaseUtils', function: 'createAppReleaseFile' })
     const latestReleaseAssets = await githubStore.getLatestRelease(appsRepo, force)
 
     if (!latestReleaseAssets) {
@@ -545,7 +545,7 @@ export async function handleRefreshReleaseFile<T extends 'app' | 'client'>(
 
         // Stonks?
       } catch (error) {
-        logger.warn(`Error fetching releases for ${appsRepo}: ${handleError(error)}`)
+        logger.warn(`Error fetching releases for ${appsRepo}: ${handleError(error)}`, { source: 'releaseUtils', function: 'handleRefreshReleaseFile' })
         update(`Failed to find new repos, reverting and continuing anyways`, 95)
       }
 
@@ -581,7 +581,7 @@ export async function handleRefreshReleaseFile<T extends 'app' | 'client'>(
           } catch (error) {
             logger.warn(
               `Failed to update ${release.id} because ${handleError(error)}. Reverting back to old version.`,
-              { function: 'handleRefreshReleaseFile' }
+              { source: 'releaseUtils', function: 'handleRefreshReleaseFile' }
             )
             update(`Failed to update ${release.id}. Reverting...`, currentProgress) // Still update the progress as a non-critical error
             return release // fallback by reverting to the previous version
@@ -676,7 +676,7 @@ export async function handleRefreshReleaseFile<T extends 'app' | 'client'>(
           }
         }
       } catch (error) {
-        logger.warn(`Error fetching releases for ${clientRepo}: ${handleError(error)}`)
+        logger.warn(`Error fetching releases for ${clientRepo}: ${handleError(error)}`, { source: 'releaseUtils', function: 'handleRefreshReleaseFile' })
         update(`Failed to find new repos, reverting and continuing anyways`, 95)
       }
 
@@ -692,6 +692,7 @@ export async function handleRefreshReleaseFile<T extends 'app' | 'client'>(
     }
   } catch (error) {
     logger.warn(`Unable to migrate ${type} release file because: ${handleError(error)}`, {
+      source: 'releaseUtils',
       function: 'handleRefreshReleaseFile'
     })
 
@@ -720,6 +721,7 @@ export const updateLatestServer = async <T extends AppLatestServer | ClientLates
   // Handle iterating through all of the releases to generate
   try {
     logger.debug(`Updating release for ${releaseLatest.id}`, {
+      source: 'releaseUtils',
       function: 'updateReleaseFile'
     })
     const githubStore = await storeProvider.getStore('githubStore')
@@ -742,7 +744,7 @@ export const updateLatestServer = async <T extends AppLatestServer | ClientLates
       : undefined
 
     if (!releaseJSON) {
-      logger.debug(`Handling release for ${releaseLatest.id}`)
+      logger.debug(`Handling release for ${releaseLatest.id}`, { source: 'releaseUtils', function: 'updateLatestServer' })
       const releaseServer = await handleAddingLegacyRepo(
         releaseLatest.mainRelease.repository,
         releaseLatest.id
@@ -771,10 +773,10 @@ export const updateLatestServer = async <T extends AppLatestServer | ClientLates
     // Update the download URL to the latest
     const latestRelease = findFirstZipAsset(allReleases, releaseLatest.id)
     if (latestRelease) {
-      logger.debug(`Updating URL for ${releaseLatest.id} to ${latestRelease.browser_download_url}`)
+      logger.debug(`Updating URL for ${releaseLatest.id} to ${latestRelease.browser_download_url}`, { source: 'releaseUtils', function: 'updateLatestServer' })
       migratedRelease.updateUrl = latestRelease.browser_download_url
     } else {
-      logger.debug(`No release found for ${releaseLatest.id}`)
+      logger.debug(`No release found for ${releaseLatest.id}`, { source: 'releaseUtils', function: 'updateLatestServer' })
     }
 
     // Get the past releases
@@ -799,7 +801,8 @@ export const updateLatestServer = async <T extends AppLatestServer | ClientLates
     logger.warn(
       `Failed to update ${releaseLatest.id} because ${handleError(error)}. Reverting back to old version.`,
       {
-        function: 'convertMultiToReleaseServer'
+        source: 'releaseUtils',
+        function: 'updateLatestServer'
       }
     )
 

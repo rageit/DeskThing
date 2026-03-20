@@ -1,6 +1,7 @@
 console.log('[ADB Handler] Starting')
 import path from 'path'
 import { execFile } from 'child_process'
+import { existsSync } from 'fs'
 import getPlatform from '@server/utils/get-platform'
 import Logger from '@server/utils/logger'
 import { storeProvider } from '../stores/storeProvider'
@@ -14,6 +15,18 @@ const execPath = isDevelopment
 
 const adbExecutableName = process.platform === 'win32' ? 'adb.exe' : 'adb'
 const adbPath = path.join(execPath, adbExecutableName)
+
+/**
+ * Checks if a command is available on the system PATH.
+ */
+const isCommandAvailable = (cmd: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const checkCmd = process.platform === 'win32' ? 'where' : 'which'
+    execFile(checkCmd, [cmd], (error) => {
+      resolve(!error)
+    })
+  })
+}
 
 /**
  * Splits a string into an array of arguments, handling quoted strings.
@@ -43,25 +56,54 @@ export const handleAdbCommands = async (command: string): Promise<string> => {
   const update = progressBus.start(ProgressChannel.ADB, 'ADB - Runner', 'Executing ADB Command')
   const settingsStore = await storeProvider.getStore('settingsStore')
   const useGlobalADB = await settingsStore.getSetting('adb_useGlobal')
-  Logger.info(useGlobalADB ? 'Using Global ADB' : 'Using Local ADB')
-  update(`Executing ${command} using ${useGlobalADB ? 'Global ADB' : 'Local ADB'}`, 10)
+
+  // Determine which ADB executable to use
+  let resolvedAdbPath: string
+  if (useGlobalADB) {
+    const globalAvailable = await isCommandAvailable('adb')
+    if (globalAvailable) {
+      resolvedAdbPath = 'adb'
+      Logger.info('Using Global ADB', { source: 'adbHandler', function: 'handleAdbCommands' })
+    } else {
+      // Fall back to local ADB if global is not found
+      Logger.warn('Global ADB not found in PATH, falling back to local ADB', {
+        source: 'adbHandler',
+        function: 'handleAdbCommands'
+      })
+      resolvedAdbPath = adbPath
+    }
+  } else {
+    // Verify local ADB exists
+    if (!existsSync(adbPath)) {
+      Logger.warn(`Local ADB not found at ${adbPath}, trying global ADB`, {
+        source: 'adbHandler',
+        function: 'handleAdbCommands'
+      })
+      resolvedAdbPath = 'adb'
+    } else {
+      resolvedAdbPath = adbPath
+      Logger.info('Using Local ADB', { source: 'adbHandler', function: 'handleAdbCommands' })
+    }
+  }
+
+  update(`Executing ${command} using ${resolvedAdbPath === 'adb' ? 'Global ADB' : 'Local ADB'}`, 10)
   return new Promise((resolve, reject) => {
     execFile(
-      useGlobalADB ? 'adb' : adbPath,
+      resolvedAdbPath,
       splitArgs(command),
       { cwd: execPath },
       (error, stdout, stderr) => {
         if (error) {
           progressBus.error(ProgressChannel.ADB, 'Error Encountered!', error.message)
           Logger.error(
-            `ADB Error: STDERR: ${stderr}  STDOUT: ${stdout}, COMMAND: ${command}, PATH: ${adbPath}`,
+            `ADB Error: STDERR: ${stderr}  STDOUT: ${stdout}, COMMAND: ${command}, PATH: ${resolvedAdbPath}`,
             {
               error: error as Error,
-              function: 'adbHandler',
+              function: 'handleAdbCommands',
               source: 'adbHandler'
             }
           )
-          reject(new Error(`ADB Error: ${stderr}, ${command}, ${adbPath}`))
+          reject(new Error(`ADB Error: ${stderr}, ${command}, ${resolvedAdbPath}`))
         } else {
           progressBus.complete(ProgressChannel.ADB, 'ADB Success!')
           resolve(stdout)

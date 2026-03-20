@@ -172,18 +172,20 @@ export async function assertReleaseFileMigration0108(
           const latestRelease = findFirstZipAsset(githubReleases, updatedRelease.appManifest.id)
           if (latestRelease) {
             logger.debug(
-              `Updating URL for ${updatedRelease.appManifest.id} to ${latestRelease.browser_download_url}`
+              `Updating URL for ${updatedRelease.appManifest.id} to ${latestRelease.browser_download_url}`,
+              { source: 'migrationUtils', function: 'assertReleaseFileMigration0108' }
             )
             updatedRelease.updateUrl = latestRelease.browser_download_url
           } else {
-            logger.debug(`No release found for ${updatedRelease.appManifest.id}`)
+            logger.debug(`No release found for ${updatedRelease.appManifest.id}`, { source: 'migrationUtils', function: 'assertReleaseFileMigration0108' })
           }
 
           pastReleases = collectPastReleases(githubReleases, updatedRelease.appManifest.id)
           totalDownloads = pastReleases.reduce((acc, release) => acc + release.downloads, 0)
         } catch (error) {
           logger.warn(
-            `There was an error collecting past releases for ${updatedRelease.appManifest.id}: ${handleError(error)}`
+            `There was an error collecting past releases for ${updatedRelease.appManifest.id}: ${handleError(error)}`,
+            { source: 'migrationUtils', function: 'assertReleaseFileMigration0108' }
           )
         }
         const latest = {
@@ -211,7 +213,8 @@ export async function assertReleaseFileMigration0108(
           totalDownloads = pastReleases.reduce((acc, release) => acc + release.downloads, 0)
         } catch (error) {
           logger.warn(
-            `There was an error collecting past releases for ${updatedRelease.clientManifest.id}: ${handleError(error)}`
+            `There was an error collecting past releases for ${updatedRelease.clientManifest.id}: ${handleError(error)}`,
+            { source: 'migrationUtils', function: 'assertReleaseFileMigration0108' }
           )
         }
         const latest = {
@@ -273,7 +276,8 @@ export const handleReleaseJSONMigration = async <
 
       if (satisfies(newRelease.meta_version, '>=0.11.8')) {
         logger.warn(
-          `Release ${newRelease.meta_type} is from the future and will be attempted to be migrated to the current version: ${newRelease.meta_version}`
+          `Release ${newRelease.meta_type} is from the future and will be attempted to be migrated to the current version: ${newRelease.meta_version}`,
+          { source: 'migrationUtils', function: 'handleReleaseJSONMigration' }
         )
       }
 
@@ -416,7 +420,7 @@ export const handleReleaseMetaToAppJSONMigration = async (
         }
       }
     } catch (error) {
-      logger.warn(`Failed to fetch latest stats for ${appId}: ${handleError(error)}`)
+      logger.warn(`Failed to fetch latest stats for ${appId}: ${handleError(error)}`, { source: 'migrationUtils', function: 'handleReleaseMetaToAppJSONMigration' })
     }
 
     return {
@@ -460,7 +464,7 @@ export const handleReleaseExternalToMultiJSONMigration = async (
     if (satisfies(releaseMeta.meta_version, '=0.11.8')) {
       return releaseMeta
     } else {
-      logger.warn(`Unable to handle translation between ${releaseMeta.meta_version} and 0.11.8`)
+      logger.warn(`Unable to handle translation between ${releaseMeta.meta_version} and 0.11.8`, { source: 'migrationUtils', function: 'handleReleaseExternalToMultiJSONMigration' })
       return { ...pastRelease, ...releaseMeta }
     }
   }
@@ -488,7 +492,7 @@ export const handleReleaseMultiToAppJSONMigration = async (
       const serverReleases = await Promise.all(
         releaseMeta.fileIds.map(async (id) => {
           return convertIdToReleaseServer(id, validatedRepoUrl, releases).catch((error) => {
-            logger.error(`Failed to convert ID ${id} to release server: ${handleError(error)}`)
+            logger.error(`Failed to convert ID ${id} to release server: ${handleError(error)}`, { source: 'migrationUtils', function: 'handleReleaseMultiToAppJSONMigration' })
             return undefined
           })
         })
@@ -674,7 +678,7 @@ export const handleReleaseMetaClientToClientJSONMigration = async (
       }
     }
   } catch (error) {
-    logger.warn(`Failed to fetch latest stats for ${releaseMeta.id}: ${handleError(error)}`)
+    logger.warn(`Failed to fetch latest stats for ${releaseMeta.id}: ${handleError(error)}`, { source: 'migrationUtils', function: 'handleReleaseMetaClientToClientJSONMigration' })
   }
 
   return {
@@ -822,7 +826,7 @@ export const handleAddingLegacyRepo = async (
       throw new Error(`Failed to find the correct manifest.json. found ${releaseManifest.id}`)
     }
   } catch (error) {
-    logger.warn(`(Expected Error) Error fetching and unzipping file: ${handleError(error)}`)
+    logger.warn(`(Expected Error) Error fetching and unzipping file: ${handleError(error)}`, { source: 'migrationUtils', function: 'handleAddingLegacyRepo' })
   }
 
   const author = releaseFile?.uploader?.login || latestRelease.author.login || 'Unknown'

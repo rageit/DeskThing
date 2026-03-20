@@ -299,7 +299,7 @@ export class WebSocketPlatform extends EventEmitter<PlatformEvents> implements P
     data: DeskThingToDeviceData & { app: T }
   ): Promise<boolean> {
     if (!this.isActive) {
-      logger.warn('Socket is not active! Failed to send data')
+      logger.warn('Socket is not active! Failed to send data', { source: 'WebSocketPlatform', function: 'sendData' })
       return false
     }
     this.worker?.postMessage({ type: 'sendData', clientId, data })
@@ -365,6 +365,7 @@ export class WebSocketPlatform extends EventEmitter<PlatformEvents> implements P
 
   getClients(): Client[] {
     logger.debug(`Getting clients. Returning ${this.clients.length} clients`, {
+      source: 'WebSocketPlatform',
       function: 'getClients'
     })
     return this.clients

@@ -208,7 +208,7 @@ export class ThingifyStore
       progress: 100
     })
 
-    logger.debug(`Downloaded to ${filePath}`)
+    logger.debug(`Downloaded to ${filePath}`, { source: 'ThingifyStore', function: 'download' })
     this.setStagedFile(fileName)
   }
 
@@ -276,7 +276,7 @@ export class ThingifyStore
       source: 'ThingifyStore',
       function: 'uploadFile'
     })
-    logger.debug(`Copied to ${destinationPath}`)
+    logger.debug(`Copied to ${destinationPath}`, { source: 'ThingifyStore', function: 'uploadFile' })
     this.setStagedFile(fileName)
   }
 
@@ -439,7 +439,7 @@ export class ThingifyStore
     const recommendedFile = availableFiles.find((file) => file.includes('8.9.2-thinglabs'))
 
     if (recommendedFile) {
-      logger.info(`Selecting recommended file: ${recommendedFile}`)
+      logger.info(`Selecting recommended file: ${recommendedFile}`, { source: 'ThingifyStore', function: 'downloadRecommendedFirmware' })
       this.setStagedFile(recommendedFile)
       progressBus.complete(ProgressChannel.ST_DEVICE_FIRMWARE_DOWNLOAD)
       progressBus.complete(ProgressChannel.ST_THINGIFY_RECOMMENDED_DOWNLOAD, 'Found installed file')
@@ -482,7 +482,7 @@ export class ThingifyStore
       )
       try {
         await this.download(this._fallback_firmware_url, '8.9.2-thinglabs-norndis.zip')
-        logger.info('Finished downloading fallback firmware')
+        logger.info('Finished downloading fallback firmware', { source: 'ThingifyStore', function: 'downloadRecommendedFirmware' })
         progressBus.complete(ProgressChannel.ST_DEVICE_FIRMWARE_DOWNLOAD)
       } catch (error) {
         // try the staged files
@@ -512,13 +512,13 @@ export class ThingifyStore
           const recommendedFile = availableFiles.find((file) => file.includes('8.9.2-thinglabs'))
 
           if (recommendedFile) {
-            logger.info(`Selecting recommended file: ${recommendedFile}`)
+            logger.info(`Selecting recommended file: ${recommendedFile}`, { source: 'ThingifyStore', function: 'downloadRecommendedFirmware' })
             this.setStagedFile(recommendedFile)
           } else {
             const fallbackFile = availableFiles[0]
 
             if (fallbackFile) {
-              logger.info(`Selecting fallback file: ${fallbackFile}`)
+              logger.info(`Selecting fallback file: ${fallbackFile}`, { source: 'ThingifyStore', function: 'downloadRecommendedFirmware' })
               this.setStagedFile(fallbackFile)
             } else {
               throw new Error('No files found matching fallback criteria')
@@ -530,7 +530,8 @@ export class ThingifyStore
             'Failed to download firmware with both methods and nothing is staged'
           )
           logger.warn(
-            'No staged file and both download attempts failed! Upload firmware manually and select it to continue'
+            'No staged file and both download attempts failed! Upload firmware manually and select it to continue',
+            { source: 'ThingifyStore', function: 'downloadRecommendedFirmware' }
           )
           throw error
         }

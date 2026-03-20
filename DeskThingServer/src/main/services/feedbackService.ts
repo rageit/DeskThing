@@ -55,7 +55,7 @@ export class FeedbackService {
       ]
     }
 
-    logger.debug(`Sending feedback to Discord: ${JSON.stringify(message)}`)
+    logger.debug(`Sending feedback to Discord: ${JSON.stringify(message)}`, { source: 'FeedbackService', function: 'sendFeedback' })
 
     try {
       const response = await fetch(this.WEBHOOK_URL, {

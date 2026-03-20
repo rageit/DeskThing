@@ -122,7 +122,7 @@ export class ReleaseStore
 
   private saveClientReleaseFile = async (clearCache = false): Promise<void> => {
     if (!this.clientReleases) {
-      logger.warn('Unable to save the client release file as it does not exist')
+      logger.warn('Unable to save the client release file as it does not exist', { source: 'ReleaseStore', function: 'saveClientReleaseFile' })
       return
     }
 
@@ -144,7 +144,7 @@ export class ReleaseStore
 
   private saveAppReleaseFile = async (clearCache = false): Promise<void> => {
     if (!this.appReleases) {
-      logger.warn('Unable to save the app release file as it does not exist')
+      logger.warn('Unable to save the app release file as it does not exist', { source: 'ReleaseStore', function: 'saveAppReleaseFile' })
       return
     }
 
@@ -721,12 +721,12 @@ export class ReleaseStore
         ]
       )
 
-      logger.debug('Downloading client')
+      logger.debug('Downloading client', { source: 'ReleaseStore', function: 'downloadLatestClient' })
 
       const clientRelease = await this.getClientRelease(clientId)
 
       if (!clientRelease) {
-        logger.debug('Client Release not found for ' + clientId || 'Latest Client')
+        logger.debug('Client Release not found for ' + clientId || 'Latest Client', { source: 'ReleaseStore', function: 'downloadLatestClient' })
         return
       }
 
