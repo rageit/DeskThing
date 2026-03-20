@@ -14,6 +14,7 @@ import {
   IconX
 } from '@renderer/assets/icons'
 import Button from '@renderer/components/Button'
+import ActionButton from '@renderer/components/ActionButton'
 import React, { useState, useRef, useMemo } from 'react'
 import { Client } from '@deskthing/types'
 import usePlatformStore from '@renderer/stores/platformStore'
@@ -21,6 +22,7 @@ import { useSettingsStore } from '@renderer/stores'
 import { ProgressChannel, SCRIPT_IDs } from '@shared/types'
 import { LogEntry } from '@renderer/components/LogEntry'
 import { useChannelProgress } from '@renderer/hooks/useProgress'
+import { useAnimatedAction } from '@renderer/hooks/useAnimatedAction'
 
 interface ClientDetailsOverlayProps {
   client: Client
@@ -51,7 +53,7 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
 
   // State Management
   const [loading, setLoading] = useState(false)
-  const [animatingIcons, setAnimatingIcons] = useState<Record<string, boolean>>({})
+  const { animating, withAnimation } = useAnimatedAction()
   const [brightness, setBrightness] = useState(client.meta?.adb?.brightness || 50)
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null)
 
@@ -84,114 +86,28 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
     }, 300)
   }
 
-  const handlePushRestartScript = async (): Promise<void> => {
-    if (!adbId) {
-      console.warn('ADBID is not set - cant run script')
-      return
-    }
-    setLoading(true)
-    setAnimatingIcons((prev) => ({ ...prev, restart_script: true }))
-    const result = await pushScript(adbId, SCRIPT_IDs.RESTART)
-    setAnimatingIcons((prev) => ({ ...prev, restart_script: false }))
-    setLoading(false)
-    console.log('Finished with: ', result)
-  }
-
   const handleToggleSupervisor = async (key: string, value: boolean): Promise<void> => {
-    setAnimatingIcons((prev) => ({ ...prev, [key]: true }))
-
-    try {
+    await withAnimation(key, async () => {
       await setServiceStatus(adbId!, key, value)
-    } catch (error) {
-      console.error(`Error toggling ${key}:`, error)
-    } finally {
-      setAnimatingIcons((prev) => ({ ...prev, [key]: false }))
-    }
-  }
-
-  const handleExecuteCommand = async (): Promise<void> => {
-    setAnimatingIcons((prev) => ({ ...prev, command: true }))
-    const response = await sendCommand(adbId!, command)
-    setResponse(response || 'No response')
-    setAnimatingIcons((prev) => ({ ...prev, command: false }))
-  }
-
-  const handlePushStaged = async (): Promise<void> => {
-    if (!adbId) {
-      console.error('ADB ID is required')
-      return
-    }
-
-    try {
-      setLoading(true)
-      await pushStaged(adbId)
-    } catch (error) {
-      console.log(error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const restartChromium = async (): Promise<void> => {
-    if (!adbId) return
-
-    setAnimatingIcons((prev) => ({ ...prev, chromium: true }))
-    await sendCommand(adbId, `shell supervisorctl restart chromium`)
-    setTimeout(() => {
-      setAnimatingIcons((prev) => ({ ...prev, chromium: false }))
-    }, 1000)
-  }
-
-  const openPort = async (): Promise<void> => {
-    if (!adbId) {
-      console.error('Unable to find ADB ID', adbId)
-      return
-    }
-    await sendCommand(adbId, `reverse tcp:${port} tcp:${port}`)
-  }
-
-  const handleRestart = async (): Promise<void> => {
-    if (!adbId) return
-
-    setAnimatingIcons((prev) => ({ ...prev, restart: true }))
-    await sendCommand(adbId, 'shell reboot')
-    setTimeout(() => {
-      setAnimatingIcons((prev) => ({ ...prev, restart: false }))
-    }, 300)
-  }
-
-  const handleShutdown = async (): Promise<void> => {
-    if (!adbId) return
-    await sendCommand(adbId, 'shell poweroff')
+    })
   }
 
   const handleSetupWifi = async (): Promise<void> => {
     if (!adbId || !wifiSsid.trim()) return
 
-    setAnimatingIcons((prev) => ({ ...prev, wifi: true }))
-    try {
+    await withAnimation('wifi', async () => {
       await setupWifi(adbId, wifiSsid.trim(), wifiPassword || undefined)
-      // Check status after setup
       const status = await getWifiStatus(adbId)
       if (status) setWifiStatus(status)
-    } catch (error) {
-      console.error('Error setting up WiFi:', error)
-    } finally {
-      setAnimatingIcons((prev) => ({ ...prev, wifi: false }))
-    }
+    })
   }
 
   const handleCheckWifiStatus = async (): Promise<void> => {
     if (!adbId) return
-    setAnimatingIcons((prev) => ({ ...prev, wifiCheck: true }))
-    try {
+    await withAnimation('wifiCheck', async () => {
       const status = await getWifiStatus(adbId)
       if (status) setWifiStatus(status)
-    } catch (error) {
-      console.error('Error checking WiFi status:', error)
-    } finally {
-      setAnimatingIcons((prev) => ({ ...prev, wifiCheck: false }))
-    }
+    })
   }
 
   const handleAddToSettings = async (): Promise<void> => {
@@ -216,80 +132,82 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
       {client.identifiers.adb && (
         <div className="space-y-6">
           <div className="flex flex-wrap justify-between gap-4">
-            <Button
+            <ActionButton
               title="Set Device Client to Staged Client"
-              className="bg-zinc-900 hover:bg-zinc-800 min-w-fit transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handlePushStaged}
+              label="Push Staged"
+              icon={<IconUpload className="flex-shrink-0" />}
+              onClick={async () => {
+                if (!adbId) return
+                setLoading(true)
+                try { await pushStaged(adbId) } catch (e) { console.log(e) } finally { setLoading(false) }
+              }}
+              isAnimating={loading}
               disabled={loading}
-            >
-              {loading ? (
-                <IconLoading className="flex-shrink-0 animate-spin" />
-              ) : (
-                <IconUpload className="flex-shrink-0" />
-              )}
-              <p className="sm:block text-ellipsis hidden text-nowrap">Push Staged</p>
-            </Button>
-            <Button
+            />
+            <ActionButton
               title="Restart Client's Chromium"
-              className="bg-zinc-900 hover:bg-zinc-800 min-w-fit transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={restartChromium}
+              label="Reload Chromium"
+              icon={<IconRefresh className="flex-shrink-0" />}
+              onClick={() => withAnimation('chromium', async () => {
+                if (!adbId) return
+                await sendCommand(adbId, `shell supervisorctl restart chromium`)
+                await new Promise((r) => setTimeout(r, 1000))
+              })}
+              isAnimating={animating.chromium}
+              animationStyle="rotate"
               disabled={loading}
-            >
-              <IconRefresh
-                className={`transition-transform flex-shrink-0 duration-1000 ${
-                  animatingIcons.chromium ? 'rotate-[360deg]' : ''
-                }`}
-              />
-              <p className="sm:block text-ellipsis hidden text-nowrap">Reload Chromium</p>
-            </Button>
-            <Button
+            />
+            <ActionButton
               title="Setup ADB Port for Device"
-              className="bg-zinc-900 hover:bg-zinc-800 min-w-fit transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={openPort}
+              label="Setup Port"
+              icon={<IconDisconnect className="flex-shrink-0" />}
+              onClick={async () => {
+                if (!adbId) return
+                await sendCommand(adbId, `reverse tcp:${port} tcp:${port}`)
+              }}
               disabled={loading}
-            >
-              <IconDisconnect className="flex-shrink-0" />
-              <p className="sm:block text-ellipsis hidden text-nowrap">Setup Port</p>
-            </Button>
-            <Button
+            />
+            <ActionButton
               title="Restart the Client"
-              className="bg-zinc-900 hover:bg-zinc-800 border-red-500/50 border transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handleRestart}
+              label="Restart"
+              icon={<IconReload className="flex-shrink-0" />}
+              onClick={() => withAnimation('restart', async () => {
+                if (!adbId) return
+                await sendCommand(adbId, 'shell reboot')
+              })}
+              isAnimating={animating.restart}
+              animationStyle="rotate"
+              danger
               disabled={loading}
-            >
-              <IconReload
-                className={`transition-transform flex-shrink-0 duration-500 ${
-                  animatingIcons.restart ? '-rotate-[360deg]' : ''
-                }`}
-              />
-              <p className="sm:block text-ellipsis hidden text-nowrap">Restart</p>
-            </Button>
-            <Button
+            />
+            <ActionButton
               title="Shutdown the Client"
-              className="bg-zinc-900 hover:bg-zinc-800 border-red-500/50 border transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handleShutdown}
+              label="Power Off"
+              icon={<IconPower className="flex-shrink-0" />}
+              onClick={async () => {
+                if (!adbId) return
+                await sendCommand(adbId, 'shell poweroff')
+              }}
+              isAnimating={loading}
+              danger
               disabled={loading}
-            >
-              {loading ? (
-                <IconLoading className="animate-spin-smooth flex-shrink-0" />
-              ) : (
-                <IconPower className="flex-shrink-0" />
-              )}
-              <p className="sm:block text-ellipsis hidden text-nowrap">Power Off</p>
-            </Button>
-            <Button
+            />
+            <ActionButton
               title="Run Restart Script"
-              className="bg-zinc-900 hover:bg-zinc-800 transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handlePushRestartScript}
+              label="Setup Restart Script"
+              icon={<IconWrench className="flex-shrink-0" />}
+              onClick={() => withAnimation('restart_script', async () => {
+                if (!adbId) return
+                setLoading(true)
+                try {
+                  await pushScript(adbId, SCRIPT_IDs.RESTART)
+                } finally {
+                  setLoading(false)
+                }
+              })}
+              isAnimating={loading}
               disabled={loading}
-            >
-              {loading ? (
-                <IconLoading className="animate-spin-smooth flex-shrink-0" />
-              ) : (
-                <IconWrench className="flex-shrink-0" />
-              )}
-              <p className="sm:block text-ellipsis hidden text-nowrap">Setup Restart Script</p>
-            </Button>
+            />
             {is_nerd && (
               <Button
                 title="Add this device to the blacklist"
@@ -365,9 +283,9 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
                 title="Check WiFi Status"
                 className="bg-zinc-800 hover:bg-zinc-700 transition-colors duration-200 p-1.5 rounded-lg ml-auto"
                 onClick={handleCheckWifiStatus}
-                disabled={animatingIcons.wifiCheck}
+                disabled={animating.wifiCheck}
               >
-                {animatingIcons.wifiCheck ? (
+                {animating.wifiCheck ? (
                   <IconLoading className="animate-spin" iconSize={16} />
                 ) : (
                   <IconRefresh iconSize={16} />
@@ -399,14 +317,14 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
                 title="Configure WiFi on Device"
                 className="bg-zinc-800 hover:bg-zinc-700 transition-colors duration-200 gap-2 rounded-lg p-2 w-full justify-center"
                 type="submit"
-                disabled={!wifiSsid.trim() || animatingIcons.wifi}
+                disabled={!wifiSsid.trim() || animating.wifi}
               >
-                {animatingIcons.wifi ? (
+                {animating.wifi ? (
                   <IconLoading className="animate-spin" />
                 ) : (
                   <IconWifi />
                 )}
-                <p className="text-sm">{animatingIcons.wifi ? 'Configuring WiFi...' : 'Setup WiFi'}</p>
+                <p className="text-sm">{animating.wifi ? 'Configuring WiFi...' : 'Setup WiFi'}</p>
               </Button>
             </form>
           </div>
@@ -452,12 +370,12 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
                         title="Toggle Supervisor"
                         className="bg-zinc-900 hover:bg-zinc-800 min-w-fit transition-colors duration-200 gap-2 px-4"
                         onClick={() => handleToggleSupervisor(key, !value)}
-                        disabled={animatingIcons[key]}
+                        disabled={animating[key]}
                       >
                         <p className="sm:block text-ellipsis hidden text-nowrap">
-                          {animatingIcons[key] ? 'Loading' : value ? 'Disable' : 'Enable'}
+                          {animating[key] ? 'Loading' : value ? 'Disable' : 'Enable'}
                         </p>
-                        {animatingIcons[key] ? (
+                        {animating[key] ? (
                           <IconLoading className="animate-spin" />
                         ) : value ? (
                           <IconPause className="text-red-500" />
@@ -476,7 +394,10 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
-                  handleExecuteCommand()
+                  withAnimation('command', async () => {
+                    const resp = await sendCommand(adbId!, command)
+                    setResponse(resp || 'No response')
+                  })
                 }}
                 className="flex gap-3 items-center w-full"
               >
@@ -492,7 +413,7 @@ const ADBDeviceDetails: React.FC<ClientDetailsOverlayProps> = ({ client }) => {
                   className="bg-zinc-800 hover:bg-zinc-700 transition-colors duration-200 p-2 rounded-lg"
                   type="submit"
                 >
-                  {animatingIcons.command ? (
+                  {animating.command ? (
                     <IconLoading className="animate-spin" />
                   ) : (
                     <IconPlay className="text-green-500" />

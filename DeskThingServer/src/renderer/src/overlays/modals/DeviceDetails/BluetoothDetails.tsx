@@ -1,17 +1,17 @@
 import {
   IconBluetooth,
   IconDisconnect,
-  IconLoading,
   IconRefresh,
   IconX
 } from '@renderer/assets/icons'
-import Button from '@renderer/components/Button'
-import React, { useState } from 'react'
+import ActionButton from '@renderer/components/ActionButton'
+import React from 'react'
 import { Client, PlatformIDs } from '@deskthing/types'
 import usePlatformStore from '@renderer/stores/platformStore'
 import { ProgressChannel } from '@shared/types'
 import { useChannelProgress } from '@renderer/hooks/useProgress'
 import { LogEntry } from '@renderer/components/LogEntry'
+import { useAnimatedAction } from '@renderer/hooks/useAnimatedAction'
 
 interface BluetoothDetailsProps {
   client: Client
@@ -24,95 +24,55 @@ const BluetoothDetails: React.FC<BluetoothDetailsProps> = ({ client }) => {
   const btRefresh = usePlatformStore((state) => state.btRefresh)
   const progress = useChannelProgress(ProgressChannel.IPC_PLATFORM)
 
-  const [animating, setAnimating] = useState<Record<string, boolean>>({})
+  const { animating, withAnimation } = useAnimatedAction()
 
   const btMeta = client.meta?.[PlatformIDs.BLUETOOTH]
   const address = btMeta?.address || client.identifiers[PlatformIDs.BLUETOOTH]?.id
-
-  const handleConnect = async (): Promise<void> => {
-    if (!address) return
-    setAnimating((prev) => ({ ...prev, connect: true }))
-    await btConnect(address)
-    setAnimating((prev) => ({ ...prev, connect: false }))
-  }
-
-  const handleDisconnect = async (): Promise<void> => {
-    if (!address) return
-    setAnimating((prev) => ({ ...prev, disconnect: true }))
-    await btDisconnect(address)
-    setAnimating((prev) => ({ ...prev, disconnect: false }))
-  }
-
-  const handleRemove = async (): Promise<void> => {
-    if (!address) return
-    setAnimating((prev) => ({ ...prev, remove: true }))
-    await btRemove(address)
-    setAnimating((prev) => ({ ...prev, remove: false }))
-  }
-
-  const handleRefresh = async (): Promise<void> => {
-    setAnimating((prev) => ({ ...prev, refresh: true }))
-    await btRefresh()
-    setAnimating((prev) => ({ ...prev, refresh: false }))
-  }
 
   return (
     <div className="h-full p-4 overflow-y-auto bg-zinc-950">
       <div className="space-y-6">
         <div className="flex flex-wrap justify-between gap-4">
           {btMeta?.connected ? (
-            <Button
+            <ActionButton
               title="Disconnect Bluetooth Device"
-              className="bg-zinc-900 hover:bg-zinc-800 border-red-500/50 border transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handleDisconnect}
-              disabled={animating.disconnect}
-            >
-              {animating.disconnect ? (
-                <IconLoading className="animate-spin flex-shrink-0" />
-              ) : (
-                <IconDisconnect className="flex-shrink-0" />
-              )}
-              <p className="sm:block text-ellipsis hidden text-nowrap">Disconnect</p>
-            </Button>
-          ) : (
-            <Button
-              title="Connect to Bluetooth Device"
-              className="bg-zinc-900 hover:bg-zinc-800 transition-colors duration-200 gap-2 rounded-lg p-3"
-              onClick={handleConnect}
-              disabled={animating.connect}
-            >
-              {animating.connect ? (
-                <IconLoading className="animate-spin flex-shrink-0" />
-              ) : (
-                <IconBluetooth className="flex-shrink-0" />
-              )}
-              <p className="sm:block text-ellipsis hidden text-nowrap">Connect</p>
-            </Button>
-          )}
-          <Button
-            title="Refresh Bluetooth Devices"
-            className="bg-zinc-900 hover:bg-zinc-800 transition-colors duration-200 gap-2 rounded-lg p-3"
-            onClick={handleRefresh}
-            disabled={animating.refresh}
-          >
-            <IconRefresh
-              className={`flex-shrink-0 transition-transform duration-1000 ${animating.refresh ? 'rotate-[360deg]' : ''}`}
+              label="Disconnect"
+              icon={<IconDisconnect className="flex-shrink-0" />}
+              onClick={() => withAnimation('disconnect', async () => {
+                if (address) await btDisconnect(address)
+              })}
+              isAnimating={animating.disconnect}
+              danger
             />
-            <p className="sm:block text-ellipsis hidden text-nowrap">Refresh</p>
-          </Button>
-          <Button
+          ) : (
+            <ActionButton
+              title="Connect to Bluetooth Device"
+              label="Connect"
+              icon={<IconBluetooth className="flex-shrink-0" />}
+              onClick={() => withAnimation('connect', async () => {
+                if (address) await btConnect(address)
+              })}
+              isAnimating={animating.connect}
+            />
+          )}
+          <ActionButton
+            title="Refresh Bluetooth Devices"
+            label="Refresh"
+            icon={<IconRefresh className="flex-shrink-0" />}
+            onClick={() => withAnimation('refresh', async () => { await btRefresh() })}
+            isAnimating={animating.refresh}
+            animationStyle="rotate"
+          />
+          <ActionButton
             title="Remove Bluetooth Device"
-            className="bg-zinc-900 hover:bg-zinc-800 border-red-500/50 border transition-colors duration-200 gap-2 rounded-lg p-3"
-            onClick={handleRemove}
-            disabled={animating.remove}
-          >
-            {animating.remove ? (
-              <IconLoading className="animate-spin flex-shrink-0" />
-            ) : (
-              <IconX className="flex-shrink-0" />
-            )}
-            <p className="sm:block text-ellipsis hidden text-nowrap">Remove</p>
-          </Button>
+            label="Remove"
+            icon={<IconX className="flex-shrink-0" />}
+            onClick={() => withAnimation('remove', async () => {
+              if (address) await btRemove(address)
+            })}
+            isAnimating={animating.remove}
+            danger
+          />
         </div>
 
         {progress.progress && (

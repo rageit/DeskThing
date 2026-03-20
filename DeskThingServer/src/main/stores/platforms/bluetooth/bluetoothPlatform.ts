@@ -6,27 +6,17 @@ import {
   ClientIdentifier,
   PlatformIDs
 } from '@deskthing/types'
-import {
-  PlatformEvents,
-  PlatformInterface,
-  PlatformStatus,
-  PlatformEvent,
-  PlatformConnectionOptions
-} from '@shared/interfaces/platformInterface'
-import EventEmitter from 'node:events'
+import { PlatformConnectionOptions } from '@shared/interfaces/platformInterface'
 import { BluetoothService, BluetoothDevice } from './bluetoothService'
 import logger from '@server/utils/logger'
 import { PlatformIPC } from '@shared/types/ipc/ipcPlatform'
 import { progressBus } from '@server/services/events/progressBus'
 import { ProgressChannel } from '@shared/types'
-import { handleError } from '@server/utils/errorHandler'
-import { ClientIdentificationService } from '@server/services/clients/clientIdentificationService'
+import { withProgress } from '@server/utils/withProgress'
+import { BasePlatform } from '../basePlatform'
 
-export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements PlatformInterface {
+export class BluetoothPlatform extends BasePlatform {
   private btService: BluetoothService
-  private isActive: boolean = false
-  private startTime: number = 0
-  private clients: Client[] = []
   private available: boolean = false
 
   public readonly id: PlatformIDs = PlatformIDs.BLUETOOTH
@@ -76,32 +66,24 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
     this.clients = []
   }
 
-  isRunning(): boolean {
-    return this.isActive
-  }
-
   public handlePlatformEvent = async <T extends PlatformIPC>(data: T): Promise<T['data']> => {
     if (data.platform !== PlatformIDs.BLUETOOTH) return undefined
 
     switch (data.type) {
-      case 'scan': {
-        progressBus.start(ProgressChannel.PLATFORM_CHANNEL, 'Bluetooth Scan', 'Scanning...')
-        try {
-          const devices = await this.btService.scan(data.duration || 10000)
-          progressBus.complete(
-            ProgressChannel.PLATFORM_CHANNEL,
-            `Found ${devices.length} devices`
-          )
-          return devices
-        } catch (error) {
-          progressBus.error(
-            ProgressChannel.PLATFORM_CHANNEL,
-            'Scan failed',
-            handleError(error)
-          )
-          return []
-        }
-      }
+      case 'scan':
+        return withProgress(
+          ProgressChannel.PLATFORM_CHANNEL,
+          'Bluetooth Scan',
+          async () => {
+            const devices = await this.btService.scan(data.duration || 10000)
+            progressBus.complete(
+              ProgressChannel.PLATFORM_CHANNEL,
+              `Found ${devices.length} devices`
+            )
+            return devices
+          },
+          { errorFallback: [] }
+        )
       case 'get': {
         switch (data.request) {
           case 'devices':
@@ -111,47 +93,37 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
         }
         break
       }
-      case 'pair': {
-        progressBus.start(ProgressChannel.PLATFORM_CHANNEL, 'Bluetooth Pair', 'Pairing...')
-        try {
-          const paired = await this.btService.pair(data.address)
-          if (paired) {
-            await this.btService.trust(data.address)
-          }
-          progressBus.complete(
-            ProgressChannel.PLATFORM_CHANNEL,
-            paired ? 'Paired successfully' : 'Pairing failed'
-          )
-          await this.refreshDevices()
-          return paired
-        } catch (error) {
-          progressBus.error(
-            ProgressChannel.PLATFORM_CHANNEL,
-            'Pairing failed',
-            handleError(error)
-          )
-          return false
-        }
-      }
-      case 'connect': {
-        progressBus.start(ProgressChannel.PLATFORM_CHANNEL, 'Bluetooth Connect', 'Connecting...')
-        try {
-          const connected = await this.btService.connect(data.address)
-          progressBus.complete(
-            ProgressChannel.PLATFORM_CHANNEL,
-            connected ? 'Connected' : 'Connection failed'
-          )
-          await this.refreshDevices()
-          return connected
-        } catch (error) {
-          progressBus.error(
-            ProgressChannel.PLATFORM_CHANNEL,
-            'Connection failed',
-            handleError(error)
-          )
-          return false
-        }
-      }
+      case 'pair':
+        return withProgress(
+          ProgressChannel.PLATFORM_CHANNEL,
+          'Bluetooth Pair',
+          async () => {
+            const paired = await this.btService.pair(data.address)
+            if (paired) await this.btService.trust(data.address)
+            progressBus.complete(
+              ProgressChannel.PLATFORM_CHANNEL,
+              paired ? 'Paired successfully' : 'Pairing failed'
+            )
+            await this.refreshDevices()
+            return paired
+          },
+          { errorFallback: false }
+        )
+      case 'connect':
+        return withProgress(
+          ProgressChannel.PLATFORM_CHANNEL,
+          'Bluetooth Connect',
+          async () => {
+            const connected = await this.btService.connect(data.address)
+            progressBus.complete(
+              ProgressChannel.PLATFORM_CHANNEL,
+              connected ? 'Connected' : 'Connection failed'
+            )
+            await this.refreshDevices()
+            return connected
+          },
+          { errorFallback: false }
+        )
       case 'disconnect': {
         try {
           const disconnected = await this.btService.disconnect(data.address)
@@ -170,12 +142,15 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
           return false
         }
       }
-      case 'refresh': {
-        progressBus.start(ProgressChannel.PLATFORM_CHANNEL, 'Refreshing Bluetooth', 'Refreshing...')
-        await this.refreshDevices()
-        progressBus.complete(ProgressChannel.PLATFORM_CHANNEL, 'Refresh complete')
-        return this.clients
-      }
+      case 'refresh':
+        return withProgress(
+          ProgressChannel.PLATFORM_CHANNEL,
+          'Refreshing Bluetooth',
+          async () => {
+            await this.refreshDevices()
+            return this.clients
+          }
+        )
     }
 
     return undefined
@@ -188,32 +163,11 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
       const devices = await this.btService.getDevices()
       const previousClients = [...this.clients]
 
-      // Build new client list from paired/connected devices
       this.clients = devices
         .filter((d) => d.paired || d.connected)
         .map((device) => this.deviceToClient(device))
 
-      // Emit disconnected events for clients no longer present
-      for (const prev of previousClients) {
-        const stillExists = this.clients.find(
-          (c) => c.identifiers[this.id]?.id === prev.identifiers[this.id]?.id
-        )
-        if (!stillExists) {
-          this.emit(PlatformEvent.CLIENT_DISCONNECTED, prev)
-        }
-      }
-
-      // Emit connected events for new clients
-      for (const client of this.clients) {
-        const wasExisting = previousClients.find(
-          (c) => c.identifiers[this.id]?.id === client.identifiers[this.id]?.id
-        )
-        if (!wasExisting) {
-          this.emit(PlatformEvent.CLIENT_CONNECTED, client)
-        }
-      }
-
-      this.emit(PlatformEvent.CLIENT_LIST, this.clients)
+      this.reconcileClients(previousClients, this.clients)
     } catch (error) {
       logger.error('Failed to refresh Bluetooth devices', {
         error: error as Error,
@@ -260,28 +214,9 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
     }
   }
 
-  private getInternalId(clientId: string): string | undefined {
-    if (this.clients.find((c) => c.identifiers[this.id]?.id === clientId)) {
-      return clientId
-    }
-    const client = this.clients.find(
-      (c) => c.clientId === clientId || c.identifiers[this.id]?.id === clientId
-    )
-    return client?.identifiers[this.id]?.id
-  }
-
-  getClients(): Client[] {
-    return this.clients
-  }
-
   fetchClients = async (): Promise<Client[]> => {
     await this.refreshDevices()
     return this.clients
-  }
-
-  getClientById(clientId: string): Client | undefined {
-    const internalId = this.getInternalId(clientId)
-    return this.clients.find((client) => client.identifiers[this.id]?.id === internalId)
   }
 
   async refreshClient(clientId: string): Promise<Client | undefined> {
@@ -300,32 +235,6 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
     return true
   }
 
-  async updateClient(
-    clientId: string,
-    newClient: Partial<Client>,
-    notify = true
-  ): Promise<Client | undefined> {
-    try {
-      const internalId = this.getInternalId(clientId)
-      const index = this.clients.findIndex(
-        (client) => client.identifiers[this.id]?.id === internalId
-      )
-      if (index === -1) return undefined
-
-      const client = this.clients[index]
-      const updatedClient = ClientIdentificationService.mergeClients(client, newClient as Client)
-      this.clients[index] = updatedClient
-      if (notify) this.emit(PlatformEvent.CLIENT_UPDATED, updatedClient)
-      return updatedClient
-    } catch (error) {
-      this.emit(
-        PlatformEvent.ERROR,
-        error instanceof Error ? error : new Error('Error updating Bluetooth client')
-      )
-      return undefined
-    }
-  }
-
   async sendData(
     _clientId: string,
     _data: DeskThingToDeviceCore & { app?: string }
@@ -336,13 +245,5 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
 
   async broadcastData(_data: DeskThingToDeviceCore & { app?: string }): Promise<void> {
     return
-  }
-
-  getStatus(): PlatformStatus {
-    return {
-      isActive: this.isActive,
-      clients: this.clients,
-      uptime: this.isActive ? Date.now() - this.startTime : 0
-    }
   }
 }
