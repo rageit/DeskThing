@@ -1,6 +1,6 @@
 import { Client, ClientManifest, PlatformIDs } from '@deskthing/types'
 import { IPC_HANDLERS, SCRIPT_IDs } from '@shared/types'
-import { PlatformIPC, ExtractPayloadFromIPC } from '@shared/types/ipc/ipcPlatform'
+import { PlatformIPC, ExtractPayloadFromIPC, BluetoothDeviceInfo } from '@shared/types/ipc/ipcPlatform'
 import { ipcRenderer } from 'electron'
 
 export const platform = {
@@ -147,13 +147,54 @@ export const platform = {
     }
   },
   bluetooth: {
-    doSomething: async (): Promise<void> => {
-      return sendPlatformData({
+    scan: async (duration?: number): Promise<BluetoothDeviceInfo[] | undefined> =>
+      await sendPlatformData({
         platform: PlatformIDs.BLUETOOTH,
-        type: 'do-something',
-        payload: 'etc'
+        type: 'scan',
+        duration
+      }),
+    getDevices: async (): Promise<BluetoothDeviceInfo[] | undefined> =>
+      await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'get',
+        request: 'devices'
+      }),
+    getStatus: async (): Promise<{ available: boolean; scanning: boolean } | undefined> =>
+      await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'get',
+        request: 'status'
+      }),
+    pair: async (address: string): Promise<boolean> =>
+      (await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'pair',
+        address
+      })) || false,
+    connect: async (address: string): Promise<boolean> =>
+      (await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'connect',
+        address
+      })) || false,
+    disconnect: async (address: string): Promise<boolean> =>
+      (await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'disconnect',
+        address
+      })) || false,
+    remove: async (address: string): Promise<boolean> =>
+      (await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'remove',
+        address
+      })) || false,
+    refresh: async (): Promise<Client[] | undefined> =>
+      await sendPlatformData({
+        platform: PlatformIDs.BLUETOOTH,
+        type: 'refresh',
+        request: 'bluetooth'
       })
-    }
   },
   refreshConnections: async (): Promise<Client[] | undefined> => {
     return sendPlatformData({

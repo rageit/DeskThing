@@ -117,24 +117,54 @@ export type BluetoothPlatformIPC = {
   platform: PlatformIDs.BLUETOOTH
 } & (
   | {
-      type: 'do-something'
-      request?: undefined
-      data?: undefined
-      payload: 'etc'
+      type: 'scan'
+      duration?: number
+      data?: BluetoothDeviceInfo[]
     }
   | {
-      type: 'do-something'
-      request?: undefined
-      data?: undefined
-      payload: 'etc'
+      type: 'get'
+      request: 'devices'
+      data?: BluetoothDeviceInfo[]
     }
   | {
-      type: 'do-something'
-      request?: undefined
-      data?: undefined
-      payload: 'etc'
+      type: 'get'
+      request: 'status'
+      data?: { available: boolean; scanning: boolean }
+    }
+  | {
+      type: 'pair'
+      address: string
+      data?: boolean
+    }
+  | {
+      type: 'connect'
+      address: string
+      data?: boolean
+    }
+  | {
+      type: 'disconnect'
+      address: string
+      data?: boolean
+    }
+  | {
+      type: 'remove'
+      address: string
+      data?: boolean
+    }
+  | {
+      type: 'refresh'
+      request: 'bluetooth'
+      data?: Client[]
     }
 )
+
+export interface BluetoothDeviceInfo {
+  address: string
+  name: string
+  paired: boolean
+  connected: boolean
+  trusted: boolean
+}
 
 export type MainProcessIPC = {
   platform: PlatformIDs.MAIN

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Client, ClientManifest } from '@deskthing/types'
 import { SCRIPT_IDs } from '@shared/types'
+import { BluetoothDeviceInfo } from '@shared/types/ipc/ipcPlatform'
 
 interface PlatformStoreState {
   initialized: boolean
@@ -27,7 +28,14 @@ interface PlatformStoreState {
   restart: (request?: string) => Promise<void>
 
   // Bluetooth
-  doSomething: () => Promise<void>
+  btScan: (duration?: number) => Promise<BluetoothDeviceInfo[] | undefined>
+  btGetDevices: () => Promise<BluetoothDeviceInfo[] | undefined>
+  btGetStatus: () => Promise<{ available: boolean; scanning: boolean } | undefined>
+  btPair: (address: string) => Promise<boolean>
+  btConnect: (address: string) => Promise<boolean>
+  btDisconnect: (address: string) => Promise<boolean>
+  btRemove: (address: string) => Promise<boolean>
+  btRefresh: () => Promise<Client[] | undefined>
 
   // Actions
   initialize: () => Promise<void>
@@ -101,8 +109,36 @@ const usePlatformStore = create<PlatformStoreState>((set, get) => ({
   },
 
   // Bluetooth Methods
-  doSomething: async () => {
-    return window.electron.platform.bluetooth.doSomething()
+  btScan: async (duration?: number) => {
+    return window.electron.platform.bluetooth.scan(duration)
+  },
+
+  btGetDevices: async () => {
+    return window.electron.platform.bluetooth.getDevices()
+  },
+
+  btGetStatus: async () => {
+    return window.electron.platform.bluetooth.getStatus()
+  },
+
+  btPair: async (address: string) => {
+    return window.electron.platform.bluetooth.pair(address)
+  },
+
+  btConnect: async (address: string) => {
+    return window.electron.platform.bluetooth.connect(address)
+  },
+
+  btDisconnect: async (address: string) => {
+    return window.electron.platform.bluetooth.disconnect(address)
+  },
+
+  btRemove: async (address: string) => {
+    return window.electron.platform.bluetooth.remove(address)
+  },
+
+  btRefresh: async () => {
+    return window.electron.platform.bluetooth.refresh()
   },
 
   // Initialize

@@ -3,6 +3,7 @@ import Overlay from '../../Overlay'
 import { Client, PlatformIDs } from '@deskthing/types'
 import { DeviceDetails } from './DeviceDetails'
 import ADBDeviceDetails from './ADBDetails'
+import BluetoothDetails from './BluetoothDetails'
 import Button from '@renderer/components/Button'
 import ErrorBoundary from '@renderer/components/ErrorBoundary'
 import WebsocketDetails from './WebsocketDetails'
@@ -32,6 +33,8 @@ const ClientDetailsOverlay: React.FC<ClientDetailsOverlayProps> = ({ onClose, cl
         return <ADBDeviceDetails client={client} />
       case PlatformIDs.WEBSOCKET:
         return <WebsocketDetails client={client} />
+      case PlatformIDs.BLUETOOTH:
+        return <BluetoothDetails client={client} />
       default:
         return <DeviceDetails client={client} />
     }
