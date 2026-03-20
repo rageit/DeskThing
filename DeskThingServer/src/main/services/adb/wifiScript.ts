@@ -48,13 +48,14 @@ export const wifiScript: ScriptInterface = async (
     await adbService.sendCommand('shell mount -o remount,rw /', deviceId)
 
     // Generate wpa_supplicant configuration
+    // Escape backslashes and double quotes for wpa_supplicant config format
     progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Generating WiFi configuration', 20)
 
-    const escapedSsid = ssid.replace(/'/g, "'\\''")
+    const escapedSsid = ssid.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
     let wpaConfig: string
     if (password) {
-      const escapedPassword = password.replace(/'/g, "'\\''")
+      const escapedPassword = password.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
       wpaConfig = `ctrl_interface=/var/run/wpa_supplicant
 update_config=1
 
@@ -73,7 +74,7 @@ network={
 }`
     }
 
-    // Write the wpa_supplicant configuration
+    // Write the wpa_supplicant configuration using heredoc (single-quoted delimiter prevents shell expansion)
     progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Writing WiFi configuration', 30)
     await adbService.sendCommand('shell mkdir -p /etc/wpa_supplicant', deviceId)
     await adbService.sendCommand(
@@ -122,7 +123,6 @@ WIFIEOF`,
     await adbService.sendCommand('shell ifconfig wlan0 up 2>/dev/null', deviceId)
 
     progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Starting wpa_supplicant', 70)
-    // Kill any existing wpa_supplicant
     await adbService.sendCommand('shell killall wpa_supplicant 2>/dev/null', deviceId)
     await adbService.sendCommand(
       'shell wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -D nl80211,wext 2>/dev/null',
@@ -133,39 +133,30 @@ WIFIEOF`,
     progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Requesting IP address via DHCP', 80)
     await adbService.sendCommand('shell udhcpc -i wlan0 -b -q 2>/dev/null', deviceId)
 
-    // Wait for connection
+    // Wait for connection to establish
+    progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Waiting for WiFi connection...', 85)
     await new Promise((resolve) => setTimeout(resolve, 3000))
 
-    // Check if connected
-    progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Checking WiFi connection', 85)
-    const ipResult = await adbService.sendCommand(
-      'shell "ifconfig wlan0 2>/dev/null | grep \'inet addr\' || echo no_ip"',
-      deviceId
-    )
+    // Check if connected using the shared method
+    progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Checking WiFi connection', 88)
+    const wifiIp = await adbService.getDeviceWifiIp(deviceId)
 
-    if (ipResult.includes('no_ip')) {
+    if (!wifiIp) {
       progressBus.warn(
         ProgressChannel.PUSH_SCRIPT,
         'WiFi configuration saved but device may not have connected yet',
         'No IP address assigned. The device may need a reboot or the credentials may be incorrect.'
       )
     } else {
-      const ipMatch = ipResult.match(/inet addr:(\S+)/)
-      if (ipMatch) {
-        logger.info(`Device ${deviceId} connected to WiFi with IP: ${ipMatch[1]}`, {
-          function: 'wifiScript',
-          source: 'wifiScript'
-        })
-        progressBus.update(
-          ProgressChannel.PUSH_SCRIPT,
-          `Connected! Device IP: ${ipMatch[1]}`,
-          90
-        )
-      }
+      logger.info(`Device ${deviceId} connected to WiFi with IP: ${wifiIp}`, {
+        function: 'wifiScript',
+        source: 'wifiScript'
+      })
+      progressBus.update(ProgressChannel.PUSH_SCRIPT, `Connected! Device IP: ${wifiIp}`, 90)
     }
 
     // Sync filesystem
-    progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Syncing filesystem', 90)
+    progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Syncing filesystem', 92)
     await adbService.sendCommand('shell sync', deviceId)
 
     // Remount as read-only
@@ -175,15 +166,9 @@ WIFIEOF`,
     if (reboot) {
       progressBus.update(ProgressChannel.PUSH_SCRIPT, 'Rebooting device', 98)
       await adbService.sendCommand('shell reboot', deviceId)
-      progressBus.complete(
-        ProgressChannel.PUSH_SCRIPT,
-        'WiFi configured and device rebooting'
-      )
+      progressBus.complete(ProgressChannel.PUSH_SCRIPT, 'WiFi configured and device rebooting')
     } else {
-      progressBus.complete(
-        ProgressChannel.PUSH_SCRIPT,
-        'WiFi configured successfully'
-      )
+      progressBus.complete(ProgressChannel.PUSH_SCRIPT, 'WiFi configured successfully')
     }
 
     return 'WiFi setup completed successfully'
