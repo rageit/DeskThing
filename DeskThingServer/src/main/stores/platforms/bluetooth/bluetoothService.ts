@@ -66,15 +66,23 @@ export class BluetoothService {
 
     try {
       await this.runCommand('power on')
-      // Start scan in background
-      this.runCommand('scan on').catch(() => {
-        /* scan runs until stopped */
-      })
+
+      // scan on is a blocking command in bluetoothctl, so we spawn it separately
+      // with its own timeout and let it run in the background
+      const scanProcess = execFile(
+        'bluetoothctl',
+        ['scan', 'on'],
+        { timeout: durationMs + 2000 },
+        () => {
+          /* process ends when timeout kills it or scan off is sent */
+        }
+      )
 
       await new Promise((resolve) => setTimeout(resolve, durationMs))
 
+      // Stop the scan gracefully; kill the process if scan off fails
       await this.runCommand('scan off').catch(() => {
-        /* ignore if already stopped */
+        scanProcess.kill()
       })
 
       return this.getDevices()
@@ -90,25 +98,25 @@ export class BluetoothService {
     try {
       const output = await this.runCommand('devices')
       const deviceLines = output.split('\n').filter((line) => line.startsWith('Device'))
-      const devices: BluetoothDevice[] = []
+      const parsed: { address: string; name: string }[] = []
 
       for (const line of deviceLines) {
         const match = line.match(/Device\s+([0-9A-F:]+)\s+(.+)/i)
         if (match) {
-          const address = match[1]
-          const name = match[2]
-          const info = await this.getDeviceInfo(address)
-          devices.push({
-            address,
-            name,
-            paired: info.paired,
-            connected: info.connected,
-            trusted: info.trusted
-          })
+          parsed.push({ address: match[1], name: match[2] })
         }
       }
 
-      return devices
+      // Fetch device info in parallel to avoid N+1 sequential queries
+      const infos = await Promise.all(parsed.map((d) => this.getDeviceInfo(d.address)))
+
+      return parsed.map((d, i) => ({
+        address: d.address,
+        name: d.name,
+        paired: infos[i].paired,
+        connected: infos[i].connected,
+        trusted: infos[i].trusted
+      }))
     } catch (error) {
       logger.error('Failed to get Bluetooth devices', {
         error: error as Error,
@@ -161,7 +169,12 @@ export class BluetoothService {
     try {
       await this.runCommand(`trust ${address}`)
       return true
-    } catch {
+    } catch (error) {
+      logger.warn(`Failed to trust ${address}`, {
+        error: error as Error,
+        function: 'trust',
+        source: 'BluetoothService'
+      })
       return false
     }
   }
@@ -190,7 +203,12 @@ export class BluetoothService {
     try {
       await this.runCommand(`disconnect ${address}`)
       return true
-    } catch {
+    } catch (error) {
+      logger.warn(`Failed to disconnect from ${address}`, {
+        error: error as Error,
+        function: 'disconnect',
+        source: 'BluetoothService'
+      })
       return false
     }
   }
@@ -202,7 +220,12 @@ export class BluetoothService {
     try {
       await this.runCommand(`remove ${address}`)
       return true
-    } catch {
+    } catch (error) {
+      logger.warn(`Failed to remove ${address}`, {
+        error: error as Error,
+        function: 'remove',
+        source: 'BluetoothService'
+      })
       return false
     }
   }

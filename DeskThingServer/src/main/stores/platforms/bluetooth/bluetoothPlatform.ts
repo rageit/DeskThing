@@ -232,7 +232,7 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
       clientId: existing?.clientId || device.address,
       connectionState: device.connected
         ? ConnectionState.Connected
-        : ConnectionState.Established,
+        : ConnectionState.Disconnected,
       connected: device.connected,
       timestamp: existing?.timestamp || Date.now(),
       identifiers: {
@@ -244,7 +244,7 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
           capabilities: this.identifier.capabilities,
           connectionState: device.connected
             ? ConnectionState.Connected
-            : ConnectionState.Established
+            : ConnectionState.Disconnected
         }
       },
       meta: {
@@ -289,7 +289,7 @@ export class BluetoothPlatform extends EventEmitter<PlatformEvents> implements P
     return this.getClientById(clientId)
   }
 
-  async refreshClients(progressMultiplier: number = 1): Promise<boolean> {
+  async refreshClients(_progressMultiplier: number = 1): Promise<boolean> {
     progressBus.start(
       ProgressChannel.REFRESH_CLIENTS,
       'Refreshing Bluetooth',

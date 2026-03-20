@@ -20,6 +20,10 @@ export const wifiScript: ScriptInterface = async (
     throw new Error('WiFi SSID is required')
   }
 
+  if (ssid.length > 32) {
+    throw new Error('WiFi SSID must be 32 characters or fewer')
+  }
+
   try {
     progressBus.start(
       ProgressChannel.PUSH_SCRIPT,
